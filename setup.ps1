@@ -138,52 +138,78 @@ function Invoke-Interactive {
 
     # 推荐
     $recItems = @($pkg.Recommended)
+    # SuffixLabeler：统一将 Desc 描述以灰色显示在包名后
+    $pkgSuffix = { param($x) if ($x.Contains('Desc') -and -not [string]::IsNullOrEmpty([string]$x.Desc)) { " ($($x.Desc))" } else { '' } }
+
+    # 辅助：从包列表中取出已安装项的 Name（用于 Locked 参数）
+    $getLockedNames = {
+        param($list)
+        @($list | Where-Object {
+                $chk = if ($_.Contains('Packages') -and $null -ne $_.Packages) { [string](@($_.Packages)[0]) } else { [string]$_.Name }
+                Test-ScoopInstalled -Name $chk
+            } | ForEach-Object { [string]$_.Name })
+    }
+
+    $recLocked = & $getLockedNames $recItems
     $recSel = Select-Items -Title '推荐安装（默认全选）：' `
         -Items $recItems `
-        -Labeler {
-        param($x)
-        $mark = if (Test-ScoopInstalled -Name $x.Name) { ' [已安装]' } else { '' }
-        "$($x.Name)$mark"
-    } `
-        -DefaultSet { param($x) [bool]$x.Default }
+        -Labeler { param($x) [string]$x.Name } `
+        -SuffixLabeler $pkgSuffix `
+        -DefaultSet { param($x) [bool]$x.Default } `
+        -Locked $recLocked
 
     # 可选 - 开发环境
     $devItems = @($pkg.Optional.Dev)
+    $devLocked = & $getLockedNames $devItems
     $devSel = Select-Items -Title '可选 - 开发环境：' `
         -Items $devItems `
-        -Labeler {
-        param($x)
-        $mark = if (Test-ScoopInstalled -Name $x.Name) { ' [已安装]' } else { '' }
-        "$($x.Name)$mark"
-    } `
-        -DefaultSet { param($x) [bool]$x.Default }
+        -Labeler { param($x) [string]$x.Name } `
+        -SuffixLabeler $pkgSuffix `
+        -DefaultSet { param($x) [bool]$x.Default } `
+        -Locked $devLocked
 
     # 可选 - 终端工具
     $termItems = @($pkg.Optional.Term)
+    $termLocked = & $getLockedNames $termItems
     $termSel = Select-Items -Title '可选 - 终端工具：' `
         -Items $termItems `
-        -Labeler {
-        param($x)
-        $mark = if (Test-ScoopInstalled -Name $x.Name) { ' [已安装]' } else { '' }
-        "$($x.Name)$mark"
-    } `
-        -DefaultSet { param($x) [bool]$x.Default }
+        -Labeler { param($x) [string]$x.Name } `
+        -SuffixLabeler $pkgSuffix `
+        -DefaultSet { param($x) [bool]$x.Default } `
+        -Locked $termLocked
 
     # 可选 - 美化工具
     $beautyItems = @($pkg.Optional.Beauty)
+    $beautyLocked = & $getLockedNames $beautyItems
     $beautySel = Select-Items -Title '可选 - 美化工具：' `
         -Items $beautyItems `
-        -Labeler {
-        param($x)
-        $mark = if (Test-ScoopInstalled -Name $x.Name) { ' [已安装]' } else { '' }
-        "$($x.Name)$mark"
-    } `
-        -DefaultSet { param($x) [bool]$x.Default }
+        -Labeler { param($x) [string]$x.Name } `
+        -SuffixLabeler $pkgSuffix `
+        -DefaultSet { param($x) [bool]$x.Default } `
+        -Locked $beautyLocked
 
     # 合并所有选中工具（去重）
     $allSelected = @()
     foreach ($s in @($recSel) + @($devSel) + @($termSel) + @($beautySel)) { $allSelected += $s }
-    $scoopApps = @($allSelected | ForEach-Object { [string]$_.Name } | Select-Object -Unique)
+
+    # 选中包的逻辑名列表（用于 dotfiles 联动）
+    $selectedPkgNames = @($allSelected | ForEach-Object { [string]$_.Name } | Select-Object -Unique)
+
+    # 实际 scoop 安装名列表：若配置了 Packages 则展开，否则用 Name
+    $scoopAppsList = [System.Collections.Generic.List[string]]::new()
+    foreach ($item in $allSelected) {
+        if ($item.Contains('Packages') -and $null -ne $item.Packages) {
+            foreach ($pkg in @($item.Packages)) {
+                $pkgStr = [string]$pkg
+                if (-not $scoopAppsList.Contains($pkgStr)) { $scoopAppsList.Add($pkgStr) }
+            }
+        }
+        else {
+            $pkgStr = [string]$item.Name
+            if (-not $scoopAppsList.Contains($pkgStr)) { $scoopAppsList.Add($pkgStr) }
+        }
+    }
+    $scoopApps = @($scoopAppsList)
 
     # ------------------------------------------------------------------
     # 5. chezmoi
@@ -235,16 +261,17 @@ function Invoke-Interactive {
     # 保存 state
     # ------------------------------------------------------------------
     $state = @{
-        Proxy_Enabled = [bool]$useProxy
-        Proxy_Url     = [string]$proxyUrl
-        Scoop_Mirror  = [bool]$useScoopMirror
-        Scoop_Apps    = @($scoopApps | ForEach-Object { [string]$_ })
-        Chezmoi_Use   = [bool]$useChezmoi
-        Chezmoi_User  = [string]$chezmoiUser
-        Chezmoi_Apply = [bool]$chezmoiApply
-        Conflict_Mode = [string]$conflictMode
-        Link_Mode     = [string]$linkMode
-        Timestamp     = (Get-Date).ToString('s')
+        Proxy_Enabled     = [bool]$useProxy
+        Proxy_Url         = [string]$proxyUrl
+        Scoop_Mirror      = [bool]$useScoopMirror
+        Scoop_Apps        = @($scoopApps | ForEach-Object { [string]$_ })
+        Selected_Packages = @($selectedPkgNames | ForEach-Object { [string]$_ })
+        Chezmoi_Use       = [bool]$useChezmoi
+        Chezmoi_User      = [string]$chezmoiUser
+        Chezmoi_Apply     = [bool]$chezmoiApply
+        Conflict_Mode     = [string]$conflictMode
+        Link_Mode         = [string]$linkMode
+        Timestamp         = (Get-Date).ToString('s')
     }
     if (-not $Ctx.WhatIf) {
         Save-WindotsState -Path $Ctx.StatePath -State $state
@@ -300,9 +327,11 @@ function Invoke-Install {
 
     # 5. 应用本地 dotfiles 配置链接
     Write-Step '--- 应用配置文件 ---'
+    # 优先用 Selected_Packages（逻辑名列表）匹配；旧版 state 无此字段时退回 Scoop_Apps
+    $pkgLookup = if ($State.Contains('Selected_Packages') -and $null -ne $State.Selected_Packages) { $State.Selected_Packages } else { $State.Scoop_Apps }
     $allItems = @()
     foreach ($s in @($Ctx.Packages.Recommended) + @($Ctx.Packages.Optional.Dev) + @($Ctx.Packages.Optional.Term) + @($Ctx.Packages.Optional.Beauty)) {
-        if ($State.Scoop_Apps -contains $s.Name) { $allItems += $s }
+        if ($pkgLookup -contains $s.Name) { $allItems += $s }
     }
     $extras = @($Ctx.Packages.Extras)
     $planned = Get-PlannedLinks -RepoRoot $Ctx.Root -SelectedItems $allItems -Extras $extras
@@ -391,9 +420,10 @@ function Invoke-Link {
 
     Write-Step '=== windots link ==='
 
+    $pkgLookup = if ($State.Contains('Selected_Packages') -and $null -ne $State.Selected_Packages) { $State.Selected_Packages } else { $State.Scoop_Apps }
     $allItems = @()
     foreach ($s in @($Ctx.Packages.Recommended) + @($Ctx.Packages.Optional.Dev) + @($Ctx.Packages.Optional.Term) + @($Ctx.Packages.Optional.Beauty)) {
-        if ($State.Scoop_Apps -contains $s.Name) { $allItems += $s }
+        if ($pkgLookup -contains $s.Name) { $allItems += $s }
     }
     $extras = @($Ctx.Packages.Extras)
     $planned = Get-PlannedLinks -RepoRoot $Ctx.Root -SelectedItems $allItems -Extras $extras

@@ -308,14 +308,17 @@ function Select-Items {
         [Parameter(Mandatory)][string]   $Title,
         [Parameter(Mandatory)][object[]] $Items,
         [scriptblock] $Labeler = { param($x) [string]$x },
+        [scriptblock] $SuffixLabeler = $null,    # 可选；返回在主标签后以灰色显示的附加文本
         [scriptblock] $DefaultSet = { param($x) $false },
-        [string[]]    $Disabled = @()           # 这些名称显示为灰色占位，不可选
+        [string[]]    $Disabled = @(),            # 这些名称显示为灰色占位，不可选
+        [string[]]    $Locked = @()               # 这些名称强制勾选且不可取消（已安装）
     )
     if ($Items.Count -eq 0) { Write-Warn "$Title : 无可选项，跳过"; return @() }
 
     $selected = New-Object 'bool[]' $Items.Count
     for ($i = 0; $i -lt $Items.Count; $i++) {
-        $selected[$i] = [bool](& $DefaultSet $Items[$i])
+        $lbl = & $Labeler $Items[$i]
+        $selected[$i] = if ($Locked -contains $lbl) { $true } else { [bool](& $DefaultSet $Items[$i]) }
     }
     $cursor = 0
 
@@ -327,19 +330,26 @@ function Select-Items {
 
         for ($i = 0; $i -lt $Items.Count; $i++) {
             $label = & $Labeler $Items[$i]
+            $suffix = if ($SuffixLabeler) { [string](& $SuffixLabeler $Items[$i]) } else { '' }
             $isDisabled = $Disabled -contains $label
+            $isLocked = $Locked -contains $label
             $mark = if ($selected[$i]) { 'x' } else { ' ' }
             $arrow = if ($i -eq $cursor) { '>' } else { ' ' }
 
             if ($isDisabled) {
-                $color = [ConsoleColor]::DarkGray
-                Write-Host ("  [ ] $label  [暂不支持]") -ForegroundColor $color
+                Write-Host ("  [ ] $label  [暂不支持]") -ForegroundColor DarkGray
+            }
+            elseif ($isLocked) {
+                Write-Host -NoNewline ("$arrow [x] $label") -ForegroundColor DarkGray
+                Write-Host ($suffix + ' [已安装]') -ForegroundColor DarkGray
             }
             else {
                 $color = if ($i -eq $cursor) { [ConsoleColor]::Cyan }
                 elseif ($selected[$i]) { [ConsoleColor]::Green }
                 else { [ConsoleColor]::Gray }
-                Write-Host ("$arrow [$mark] $label") -ForegroundColor $color
+                Write-Host -NoNewline ("$arrow [$mark] $label") -ForegroundColor $color
+                if ($suffix) { Write-Host $suffix -ForegroundColor DarkGray }
+                else { Write-Host '' }
             }
         }
 
@@ -349,15 +359,22 @@ function Select-Items {
             'DownArrow' { if ($cursor -lt $Items.Count - 1) { $cursor++ } }
             'Spacebar' {
                 $lbl = & $Labeler $Items[$cursor]
-                if ($Disabled -notcontains $lbl) { $selected[$cursor] = -not $selected[$cursor] }
+                if ($Disabled -notcontains $lbl -and $Locked -notcontains $lbl) {
+                    $selected[$cursor] = -not $selected[$cursor]
+                }
             }
             'A' {
                 for ($i = 0; $i -lt $Items.Count; $i++) {
                     $lbl = & $Labeler $Items[$i]
-                    if ($Disabled -notcontains $lbl) { $selected[$i] = $true }
-                } 
+                    if ($Disabled -notcontains $lbl -and $Locked -notcontains $lbl) { $selected[$i] = $true }
+                }
             }
-            'N' { for ($i = 0; $i -lt $Items.Count; $i++) { $selected[$i] = $false } }
+            'N' {
+                for ($i = 0; $i -lt $Items.Count; $i++) {
+                    $lbl = & $Labeler $Items[$i]
+                    if ($Locked -notcontains $lbl) { $selected[$i] = $false }
+                }
+            }
             'Enter' {
                 $result = @()
                 for ($i = 0; $i -lt $Items.Count; $i++) {
