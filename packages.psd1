@@ -34,66 +34,18 @@
     # ------------------------------------------------------------------
     Recommended     = @(
         @{ Name = 'curl'; Default = $true }
-        @{
-            Name     = 'fd'
-            Default  = $true
-            Dotfiles = $null
-        }
-        @{
-            Name     = 'sudo'
-            Default  = $true
-            Dotfiles = $null
-        }
-        # @{
-        #     Name     = 'aria2'
-        #     Default  = $true
-        #     Dotfiles = $null
-        # }
-        @{
-            Name     = 'bat'
-            Default  = $true
-            Dotfiles = @{ Src = 'dotfiles/bat'; Dest = 'APPDATA\bat' }
-        }
-        @{
-            Name     = 'delta'
-            Default  = $true
-            Dotfiles = $null
-        }
-        @{
-            Name     = 'eza'
-            Default  = $true
-            Dotfiles = $null
-        }
-        @{
-            Name     = 'fzf'
-            Default  = $true
-            Dotfiles = $null
-        }
-        @{
-            Name     = 'jd'
-            Default  = $true
-            Dotfiles = $null
-        }
-        @{
-            Name     = 'jq'
-            Default  = $true
-            Dotfiles = $null
-        }
-        @{
-            Name     = 'ripgrep'
-            Default  = $true
-            Dotfiles = $null
-        }
-        @{
-            Name     = 'tldr'
-            Default  = $true
-            Dotfiles = $null
-        }
-        @{
-            Name     = 'zoxide'
-            Default  = $true
-            Dotfiles = $null
-        }
+        @{ Name = 'fd'; Default = $true }
+        @{ Name = 'sudo'; Default = $true }
+        @{ Name = 'aria2'; Default = $false }
+        @{ Name = 'bat'; Default = $true }
+        @{ Name = 'delta'; Default = $true }
+        @{ Name = 'eza'; Default = $true }
+        @{ Name = 'fzf'; Default = $true }
+        @{ Name = 'jd'; Default = $true }
+        @{ Name = 'jq'; Default = $true }
+        @{ Name = 'ripgrep'; Default = $true }
+        @{ Name = 'tldr'; Default = $true }
+        @{ Name = 'zoxide'; Default = $true }
     )
 
     # ------------------------------------------------------------------
@@ -103,54 +55,19 @@
 
         # 开发环境
         Dev    = @(
-            @{
-                Name     = 'mise'
-                Default  = $false
-                Dotfiles = $null
-            }
-            @{
-                Name     = 'fnm'
-                Default  = $false
-                Dotfiles = $null
-            }
-            @{
-                Name     = 'pnpm'
-                Default  = $false
-                Dotfiles = $null
-            }
-            @{
-                Name     = 'rust'
-                Default  = $false
-                Dotfiles = $null
-            }
-            @{
-                Name    = 'starship'
-                Default = $false
-            }
+            @{ Name = 'mise'; Default = $false }
+            @{ Name = 'fnm'; Default = $false }
+            @{ Name = 'pnpm'; Default = $false }
+            @{ Name = 'rust'; Default = $false }
+            @{ Name = 'starship'; Default = $false }
         )
 
         # 终端工具
         Term   = @(
-            @{
-                Name     = 'lazygit'
-                Default  = $false
-                Dotfiles = @{ Src = 'dotfiles/lazygit'; Dest = 'APPDATA\lazygit' }
-            }
-            @{
-                Name     = 'neovim'
-                Default  = $false
-                Dotfiles = $null
-            }
-            @{
-                Name     = 'yazi'
-                Default  = $false
-                Dotfiles = $null
-            }
-            @{
-                Name     = 'zellij'
-                Default  = $false
-                Dotfiles = $null
-            }
+            @{ Name = 'lazygit'; Default = $false }
+            @{ Name = 'neovim'; Default = $false }
+            @{ Name = 'yazi'; Default = $false }
+            @{ Name = 'zellij'; Default = $false }
         )
 
         # 美化工具
@@ -158,7 +75,12 @@
             @{
                 Name     = 'glazewm'
                 Default  = $false
-                Dotfiles = $null
+                Dotfiles = @{ Src = 'dotfiles/glazewm/config.yaml'; Dest = 'HOME\.glzr\glazewm\config.yaml' }
+            }
+            @{
+                Name     = 'zebar'
+                Default  = $false
+                Dotfiles = @{ Src = 'dotfiles/zebar/settings.json'; Dest = 'HOME\.glzr\zebar\settings.json' }
             }
             @{
                 Name     = 'yasb'
@@ -189,10 +111,6 @@
         @{
             Src  = 'dotfiles/windowsterminal/settings.json'
             Dest = 'LOCAL_APPDATA\Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\settings.json'
-        }
-        @{
-            Src  = 'dotfiles/git/.gitconfig'
-            Dest = 'HOME\.gitconfig'
         }
     )
 }

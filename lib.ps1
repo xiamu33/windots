@@ -712,10 +712,14 @@ function Get-PlannedLinks {
     $links = [System.Collections.Generic.List[object]]::new()
 
     foreach ($item in $SelectedItems) {
-        if ((-not ($item.PSObject.Properties.Name -contains 'Dotfiles')) -or ($null -eq $item.Dotfiles)) { continue }
-        $src = Resolve-RepoPath -RepoRoot $RepoRoot -Value ([string]$item.Dotfiles.Src)
-        $dest = Resolve-DestPath -Dest ([string]$item.Dotfiles.Dest)
-        $links.Add([pscustomobject]@{ Src = $src; Dest = $dest; Label = $item.Name })
+        if ((-not $item.Contains('Dotfiles')) -or ($null -eq $item.Dotfiles)) { continue }
+        $dotfilesList = @($item.Dotfiles)
+        foreach ($dot in $dotfilesList) {
+            if ($null -eq $dot) { continue }
+            $src = Resolve-RepoPath -RepoRoot $RepoRoot -Value ([string]$dot.Src)
+            $dest = Resolve-DestPath -Dest ([string]$dot.Dest)
+            $links.Add([pscustomobject]@{ Src = $src; Dest = $dest; Label = $item.Name })
+        }
     }
 
     foreach ($extra in $Extras) {
