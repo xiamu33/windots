@@ -795,16 +795,126 @@ function Get-PlannedLinks {
     return @($links)
 }
 
+# NTFS 文件身份（卷 + File ID），用于判断硬链接是否指向同一文件
+function Get-NtfsFileIdentity {
+    param([Parameter(Mandatory)][string] $Path)
+
+    $item = Get-Item -LiteralPath $Path -Force -ErrorAction SilentlyContinue
+    if (-not $item -or $item.PSIsContainer) { return $null }
+    try {
+        $lines = @(& fsutil.exe file queryfileid $item.FullName 2>&1)
+        $joined = ($lines | ForEach-Object { [string]$_ }) -join ' '
+        if ($joined -match '(0x[0-9a-fA-F]+)') {
+            $vol = $item.Directory.Root.FullName.TrimEnd('\')
+            return "$vol|$($matches[1].ToLower())"
+        }
+    }
+    catch { }
+    return $null
+}
+
+function Test-SameNtfsFile {
+    param(
+        [Parameter(Mandatory)][string] $Path1,
+        [Parameter(Mandatory)][string] $Path2
+    )
+
+    if (-not ((Test-Path -LiteralPath $Path1) -and (Test-Path -LiteralPath $Path2))) { return $false }
+    try {
+        $full1 = [IO.Path]::GetFullPath($Path1)
+        $full2 = [IO.Path]::GetFullPath($Path2)
+        if ($full1 -eq $full2) { return $true }
+    }
+    catch { return $false }
+
+    $id1 = Get-NtfsFileIdentity -Path $Path1
+    $id2 = Get-NtfsFileIdentity -Path $Path2
+    return ($null -ne $id1) -and ($id1 -eq $id2)
+}
+
+# 创建配置链接：hardlink → symlink → copy（仅 hardlink 模式启用完整回退链）
+function Set-ConfigFileLink {
+    param(
+        [Parameter(Mandatory)][string] $Src,
+        [Parameter(Mandatory)][string] $Dest,
+        [Parameter(Mandatory)][string] $LinkMode
+    )
+
+    $srcItem = Get-Item -LiteralPath $Src -Force
+    $tryModes = @()
+
+    switch ($LinkMode) {
+        'hardlink' {
+            if (-not $srcItem.PSIsContainer) { $tryModes += 'hardlink' }
+            else { Write-Warn "目录无法硬链接，尝试符号链接：$Dest" }
+            $tryModes += 'symlink'
+            $tryModes += 'copy'
+        }
+        'symlink' { $tryModes += 'symlink' }
+        default { $tryModes += 'copy' }
+    }
+
+    foreach ($mode in $tryModes) {
+        if ($mode -eq 'hardlink') {
+            try {
+                New-Item -ItemType HardLink -Path $Dest -Target $Src -Force | Out-Null
+                Write-Success "硬链接：$Dest ⇄ $Src"
+                return 'ok'
+            }
+            catch {
+                Write-Warn "硬链接失败（$($_.Exception.Message)），尝试符号链接..."
+            }
+            continue
+        }
+        if ($mode -eq 'symlink') {
+            try {
+                New-Item -ItemType SymbolicLink -Path $Dest -Target $Src -Force | Out-Null
+                Write-Success "符号链接：$Dest → $Src"
+                return 'ok'
+            }
+            catch {
+                if ($LinkMode -eq 'hardlink') {
+                    Write-Warn "符号链接失败（$($_.Exception.Message)），改为复制..."
+                }
+                else {
+                    Write-Err "创建符号链接失败：$Dest ($($_.Exception.Message))"
+                    return 'failed'
+                }
+            }
+            continue
+        }
+        # copy
+        try {
+            if ($srcItem.PSIsContainer) {
+                Copy-Item -Path $Src -Destination $Dest -Recurse -Force
+            }
+            else {
+                Copy-Item -Path $Src -Destination $Dest -Force
+            }
+            Write-Success "已复制：$Dest ← $Src"
+            return 'ok'
+        }
+        catch {
+            Write-Err "复制失败：$Dest ($($_.Exception.Message))"
+            return 'failed'
+        }
+    }
+
+    return 'failed'
+}
+
 # 在应用所有配置前，一次性确定实际使用的链接模式
 # 若请求 symlink 但未开启开发者模式，弹一次提示让用户选择 (R)重试/(C)复制
-# WhatIf 模式下直接返回请求的模式（不交互）
+# hardlink / copy 无需开发者模式；WhatIf 模式下直接返回请求的模式（不交互）
 function Resolve-LinkMode {
     param(
-        [string] $RequestedMode = 'symlink',
+        [string] $RequestedMode = 'hardlink',
         [switch] $WhatIf
     )
 
-    if ($RequestedMode -ne 'symlink' -or $WhatIf) { return $RequestedMode }
+    if ($WhatIf -or $RequestedMode -eq 'copy' -or $RequestedMode -eq 'hardlink') { return $RequestedMode }
+
+    if ($RequestedMode -ne 'symlink') { return $RequestedMode }
 
     # 已有权限（开发者模式或管理员）→ 直接用 symlink
     if ((Test-DeveloperMode) -or (Test-IsAdministrator)) { return 'symlink' }
@@ -832,9 +942,9 @@ function Resolve-LinkMode {
     }
 }
 
-# 应用单个配置项（软链接或复制）
+# 应用单个配置项（硬链接 / 软链接 / 复制）
 # $ConflictMode : 'overwrite' | 'backup' | 'keep'
-# $LinkMode     : 'symlink' | 'copy'（应已由 Resolve-LinkMode 预先确定，不再自行弹交互）
+# $LinkMode     : 'hardlink' | 'symlink' | 'copy'（hardlink 失败时自动回退 symlink → copy）
 # 返回 'ok' | 'skipped' | 'failed'
 function Apply-Config {
     param(
@@ -842,7 +952,7 @@ function Apply-Config {
         [Parameter(Mandatory)][string] $Dest,
         [Parameter(Mandatory)][string] $BackupRoot,
         [string] $ConflictMode = 'overwrite',
-        [string] $LinkMode = 'symlink',
+        [string] $LinkMode = 'hardlink',
         [switch] $WhatIf
     )
 
@@ -854,13 +964,28 @@ function Apply-Config {
 
     # 目标已存在的处理
     if (Test-Path $Dest -ErrorAction SilentlyContinue) {
-        # 检查是否已是指向正确源的符号链接
+        # 检查是否已是正确链接（符号链接或硬链接至同一文件）
         $item = Get-Item $Dest -Force -ErrorAction SilentlyContinue
         if ($item) {
             $isSymlink = [bool]($item.Attributes -band [IO.FileAttributes]::ReparsePoint)
-            if ($isSymlink -and $item.Target -eq $Src) {
-                Write-Success "链接已正确：$Dest"
-                return 'ok'
+            if ($isSymlink) {
+                $target = $item.Target
+                if ($target -is [array]) { $target = $target[0] }
+                try {
+                    $targetFull = [IO.Path]::GetFullPath($target)
+                    $srcFull = [IO.Path]::GetFullPath($Src)
+                    if ($targetFull -eq $srcFull) {
+                        Write-Success "链接已正确：$Dest"
+                        return 'ok'
+                    }
+                }
+                catch { }
+            }
+            elseif (-not $item.PSIsContainer) {
+                if (Test-SameNtfsFile -Path1 $Dest -Path2 $Src) {
+                    Write-Success "硬链接已正确：$Dest"
+                    return 'ok'
+                }
             }
         }
 
@@ -901,42 +1026,16 @@ function Apply-Config {
         }
     }
 
-    if ($LinkMode -eq 'symlink') {
-        if ($WhatIf) {
-            Write-Plan "[WhatIf] New-Item -ItemType SymbolicLink -Path '$Dest' -Target '$Src'"
-            return 'ok'
+    if ($WhatIf) {
+        switch ($LinkMode) {
+            'hardlink' { Write-Plan "[WhatIf] 硬链接（失败则符号链接→复制） '$Dest' ⇄ '$Src'" }
+            'symlink' { Write-Plan "[WhatIf] New-Item -ItemType SymbolicLink -Path '$Dest' -Target '$Src'" }
+            default { Write-Plan "[WhatIf] Copy-Item '$Src' → '$Dest'" }
         }
-        try {
-            New-Item -ItemType SymbolicLink -Path $Dest -Target $Src -Force | Out-Null
-            Write-Success "符号链接：$Dest → $Src"
-            return 'ok'
-        }
-        catch {
-            Write-Err "创建符号链接失败：$Dest ($($_.Exception.Message))"
-            return 'failed'
-        }
+        return 'ok'
     }
-    else {
-        # copy
-        if ($WhatIf) {
-            Write-Plan "[WhatIf] Copy-Item '$Src' → '$Dest'"
-            return 'ok'
-        }
-        try {
-            if ((Get-Item $Src).PSIsContainer) {
-                Copy-Item -Path $Src -Destination $Dest -Recurse -Force
-            }
-            else {
-                Copy-Item -Path $Src -Destination $Dest -Force
-            }
-            Write-Success "已复制：$Dest ← $Src"
-            return 'ok'
-        }
-        catch {
-            Write-Err "复制失败：$Dest ($($_.Exception.Message))"
-            return 'failed'
-        }
-    }
+
+    return Set-ConfigFileLink -Src $Src -Dest $Dest -LinkMode $LinkMode
 }
 
 

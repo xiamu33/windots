@@ -240,9 +240,13 @@ function Invoke-Interactive {
     }
 
     $linkChoice = Select-One -Title '如何应用配置文件？' `
-        -Items @('软链接（推荐）', '复制文件') `
+        -Items @('硬链接（推荐，需源与目标同盘）', '软链接', '复制文件') `
         -DefaultIdx 0
-    $linkMode = if ($linkChoice -eq '复制文件') { 'copy' } else { 'symlink' }
+    $linkMode = switch ($linkChoice) {
+        '复制文件' { 'copy' }
+        '软链接' { 'symlink' }
+        default { 'hardlink' }
+    }
 
     # ------------------------------------------------------------------
     # 计划摘要
