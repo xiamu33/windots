@@ -83,10 +83,14 @@ function Resolve-RepoPath {
 #   APPDATA\...            -> $env:APPDATA\...
 #   LOCAL_APPDATA\...      -> $env:LOCALAPPDATA\...
 #   HOMEPATH\...           -> $env:HOMEPATH\...（较少用）
+#   PROFILE -> $PROFILE
 #   PROFILE_CurrentUserAllHosts -> $PROFILE.CurrentUserAllHosts
 function Resolve-DestPath {
     param([Parameter(Mandatory)][string] $Dest)
 
+    if ($Dest -eq 'PROFILE') {
+        return $PROFILE
+    }
     if ($Dest -eq 'PROFILE_CurrentUserAllHosts') {
         return $PROFILE.CurrentUserAllHosts
     }
@@ -308,7 +312,7 @@ function Select-Items {
         [Parameter(Mandatory)][string]   $Title,
         [Parameter(Mandatory)][object[]] $Items,
         [scriptblock] $Labeler = { param($x) [string]$x },
-        [scriptblock] $SuffixLabeler = $null,    # 可选；返回在主标签后以灰色显示的附加文本
+        [scriptblock] $SuffixLabeler = $null,    # 可选；返回在主标签后以 DarkCyan 显示的附加文本（如 Desc）
         [scriptblock] $DefaultSet = { param($x) $false },
         [string[]]    $Disabled = @(),            # 这些名称显示为灰色占位，不可选
         [string[]]    $Locked = @()               # 这些名称强制勾选且不可取消（已安装）
@@ -322,11 +326,46 @@ function Select-Items {
     }
     $cursor = 0
 
+    # 控制台显示宽度：中文/全角字符按 2 列，英文/半角按 1 列
+    $getDisplayWidth = {
+        param([string]$Text)
+        if ([string]::IsNullOrEmpty($Text)) { return 0 }
+        $width = 0
+        foreach ($ch in $Text.ToCharArray()) {
+            $code = [int][char]$ch
+            $isWide = (
+                ($code -ge 0x1100 -and $code -le 0x115F) -or
+                ($code -ge 0x2E80 -and $code -le 0xA4CF) -or
+                ($code -ge 0xAC00 -and $code -le 0xD7A3) -or
+                ($code -ge 0xF900 -and $code -le 0xFAFF) -or
+                ($code -ge 0xFE10 -and $code -le 0xFE6F) -or
+                ($code -ge 0xFF00 -and $code -le 0xFF60) -or
+                ($code -ge 0xFFE0 -and $code -le 0xFFE6)
+            )
+            $width += if ($isWide) { 2 } else { 1 }
+        }
+        return $width
+    }
+
     while ($true) {
         Clear-Host
         Write-Host $Title -ForegroundColor Magenta
         Write-Host '  ↑/↓ 移动  空格 切换  A 全选  N 全不选  Enter 确认  Esc 取消' -ForegroundColor DarkGray
         Write-Host ''
+
+        # 让 [已安装] 标签在同一竖列中（按当前菜单所有包项前缀宽度计算）
+        $installedTagBaseWidth = 0
+        for ($i = 0; $i -lt $Items.Count; $i++) {
+            $label = & $Labeler $Items[$i]
+            $suffix = if ($SuffixLabeler) { [string](& $SuffixLabeler $Items[$i]) } else { '' }
+            $isDisabled = $Disabled -contains $label
+            if ($isDisabled) { continue }
+            $arrow = if ($i -eq $cursor) { '>' } else { ' ' }
+            $mark = if ($selected[$i]) { 'x' } else { ' ' }
+            $textLen = & $getDisplayWidth ("$arrow [$mark] $label$suffix")
+            if ($textLen -gt $installedTagBaseWidth) { $installedTagBaseWidth = $textLen }
+        }
+        if ($installedTagBaseWidth -gt 0) { $installedTagBaseWidth += 2 }
 
         for ($i = 0; $i -lt $Items.Count; $i++) {
             $label = & $Labeler $Items[$i]
@@ -340,15 +379,23 @@ function Select-Items {
                 Write-Host ("  [ ] $label  [暂不支持]") -ForegroundColor DarkGray
             }
             elseif ($isLocked) {
-                Write-Host -NoNewline ("$arrow [x] $label") -ForegroundColor DarkGray
-                Write-Host ($suffix + ' [已安装]') -ForegroundColor DarkGray
+                $lockedText = "$arrow [x] $label$suffix"
+                $lockedWidth = & $getDisplayWidth $lockedText
+                if ($installedTagBaseWidth -gt 0) {
+                    Write-Host -NoNewline ($lockedText + (' ' * [Math]::Max(0, ($installedTagBaseWidth - $lockedWidth)))) -ForegroundColor DarkGray
+                }
+                else {
+                    Write-Host -NoNewline $lockedText -ForegroundColor DarkGray
+                    Write-Host -NoNewline '  '
+                }
+                Write-Host '[已安装]' -ForegroundColor DarkGreen
             }
             else {
                 $color = if ($i -eq $cursor) { [ConsoleColor]::Cyan }
                 elseif ($selected[$i]) { [ConsoleColor]::Green }
                 else { [ConsoleColor]::Gray }
                 Write-Host -NoNewline ("$arrow [$mark] $label") -ForegroundColor $color
-                if ($suffix) { Write-Host $suffix -ForegroundColor DarkGray }
+                if ($suffix) { Write-Host $suffix -ForegroundColor DarkCyan }
                 else { Write-Host '' }
             }
         }
