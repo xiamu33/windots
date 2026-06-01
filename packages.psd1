@@ -170,7 +170,10 @@
                 Name     = 'yasb'
                 Default  = $false
                 Desc     = 'Windows 状态栏'
-                Dotfiles = $null
+                Dotfiles = @(
+                    @{ Src = 'dotfiles/yasb/config.yaml'; Dest = 'HOME\.config\yasb\config.yaml' }
+                    @{ Src = 'dotfiles/yasb/styles.css'; Dest = 'HOME\.config\yasb\styles.css' }
+                )
             }
             @{
                 Name    = 'flow-launcher'
@@ -183,6 +186,7 @@
     # ------------------------------------------------------------------
     # 全局配置（不属于具体工具，但需要链接到系统）
     # Dest 中的特殊占位符由脚本展开：
+    #   PROFILE -> $PROFILE
     #   PROFILE_CurrentUserAllHosts -> $PROFILE.CurrentUserAllHosts
     #   HOME\... -> $HOME\...
     #   APPDATA\... -> $env:APPDATA\...
@@ -191,11 +195,11 @@
     Extras          = @(
         @{
             Src  = 'dotfiles/powershell/Profile.ps1'
-            Dest = 'PROFILE_CurrentUserAllHosts'
+            Dest = 'PROFILE'
         }
-        @{
-            Src  = 'dotfiles/windowsterminal/settings.json'
-            Dest = 'LOCAL_APPDATA\Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\settings.json'
-        }
+        # @{
+        #     Src  = 'dotfiles/windowsterminal/settings.json'
+        #     Dest = 'LOCAL_APPDATA\Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\settings.json'
+        # }
     )
 }
