@@ -2,11 +2,13 @@
 # Windots 国际化引擎 (lib/i18n.ps1)
 # =====================================================================
 
+$Script:WindotsDefaultLocale = 'en-US'
+
 $Global:WindotsMessages = $null
 $Global:WindotsMessagesFallback = $null
-$Global:WindotsLocale = 'zh-CN'
+$Global:WindotsLocale = $Script:WindotsDefaultLocale
 
-# 加载 i18n 目录。优先级：$Language 参数 > settings.psd1 Language > 系统区域 > 回退 zh-CN
+# 加载 i18n 目录。优先级：$Language 参数 > settings.psd1 Language > 系统区域 > 回退 en-US
 function Initialize-I18n {
     param(
         [Parameter(Mandatory)][string] $Root,
@@ -20,15 +22,15 @@ function Initialize-I18n {
         $culture = (Get-Culture).Name
         if ($culture -like 'zh-*') { 'zh-CN' }
         elseif ($culture -like 'en-*') { 'en-US' }
-        else { 'zh-CN' }
+        else { $Script:WindotsDefaultLocale }
     }
 
     $i18nDir = Join-Path $Root 'i18n'
     $catalogPath = Join-Path $i18nDir "$locale.psd1"
 
     if (-not (Test-Path $catalogPath)) {
-        $locale = 'zh-CN'
-        $catalogPath = Join-Path $i18nDir 'zh-CN.psd1'
+        $locale = $Script:WindotsDefaultLocale
+        $catalogPath = Join-Path $i18nDir "$($Script:WindotsDefaultLocale).psd1"
     }
 
     $Global:WindotsLocale = $locale
@@ -40,9 +42,9 @@ function Initialize-I18n {
         $Global:WindotsMessages = @{}
     }
 
-    # 非 zh-CN 时加载 zh-CN 作为回退
-    if ($locale -ne 'zh-CN') {
-        $fallbackPath = Join-Path $i18nDir 'zh-CN.psd1'
+    # 当主语言不是默认语言时，用 en-US 作为键缺失回退
+    if ($locale -ne $Script:WindotsDefaultLocale) {
+        $fallbackPath = Join-Path $i18nDir "$($Script:WindotsDefaultLocale).psd1"
         if (Test-Path $fallbackPath) {
             $Global:WindotsMessagesFallback = Import-PowerShellDataFile -Path $fallbackPath
         }
