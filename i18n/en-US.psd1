@@ -1,4 +1,4 @@
-﻿# =====================================================================
+# =====================================================================
 # Windots Message Catalog - English (i18n/en-US.psd1)
 # =====================================================================
 @{
@@ -19,15 +19,6 @@
     'ui.single.hint'                     = '  Up/Down Move  Enter Confirm'
     'ui.yesno.invalid'                   = 'Please enter y or n'
     'ui.text.default'                    = '{0} (default: {1})'
-
-    # --- Bootstrap ---
-    'bootstrap.title'                    = '=== Bootstrap: PowerShell 5.1 Setup ==='
-    'bootstrap.warn'                     = 'Currently running in PowerShell 5.1. Will install PowerShell 7 first, then continue in a new window.'
-    'bootstrap.proxy.prompt'             = 'Use a proxy to install PowerShell 7 (accessing GitHub)?'
-    'bootstrap.proxy.url'                = 'Proxy URL'
-    'bootstrap.ps7.fail'                 = 'Failed to install PowerShell 7. Exiting.'
-    'bootstrap.launching'                = 'Launching PowerShell 7 window to continue...'
-    'bootstrap.launched'                 = 'PowerShell 7 window launched. This window can be closed.'
 
     # --- Git ---
     'git.installed'                      = 'git is already installed, skipping'
@@ -173,9 +164,7 @@
     'link.src.skip'                      = 'Source missing, skipping: {0}'
 
     # --- Main flow ---
-    'setup.ps5.switching'                = 'Running in PowerShell 5.1, switching to pwsh 7...'
-    'setup.git.step'                     = '--- Checking base dependency: git ---'
-    'setup.deps.ready'                   = 'Base dependencies ready, starting interactive setup...'
+    'setup.ps7.required'                = "Windots setup requires PowerShell 7+ (pwsh).`nRun install.ps1 first, or: pwsh -File setup.ps1"
     'setup.state.title'                  = '=== Saved Configuration Found ==='
     'setup.state.timestamp'              = 'Last saved       : {0}'
     'setup.state.proxy'                  = 'Proxy            : {0}'

@@ -1,4 +1,4 @@
-﻿# PowerShell profile scaffold.
+# PowerShell profile scaffold.
 if (Get-Command starship -ErrorAction SilentlyContinue) {
   &starship init powershell | Invoke-Expression
 }

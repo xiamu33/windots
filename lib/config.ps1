@@ -1,4 +1,4 @@
-﻿# =====================================================================
+# =====================================================================
 # Windots 配置与状态文件 (lib/config.ps1)
 # =====================================================================
 
@@ -137,6 +137,6 @@ function Save-WindotsState {
         [void]$sb.AppendLine("    $key$pad = $(ConvertTo-PsLiteral -Value $State[$key])")
     }
     [void]$sb.AppendLine('}')
-    $utf8Bom = [Text.UTF8Encoding]::new($true)
-    [IO.File]::WriteAllText($Path, $sb.ToString(), $utf8Bom)
+    $utf8 = [Text.UTF8Encoding]::new($false)
+    [IO.File]::WriteAllText($Path, $sb.ToString(), $utf8)
 }

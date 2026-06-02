@@ -1,4 +1,4 @@
-﻿# =====================================================================
+# =====================================================================
 # Windots 库加载器 (lib/_load.ps1)
 # 由 setup.ps1 通过 dot-source 加载，按依赖顺序导入所有模块
 # =====================================================================
@@ -12,7 +12,6 @@ $_libDir = $PSScriptRoot
 . "$_libDir\detect.ps1"
 . "$_libDir\proxy.ps1"
 . "$_libDir\ui.ps1"
-. "$_libDir\bootstrap.ps1"
 . "$_libDir\shim.ps1"
 . "$_libDir\scoop.ps1"
 . "$_libDir\backup.ps1"

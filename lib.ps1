@@ -13,7 +13,6 @@
 #   lib/detect.ps1       — 环境检测
 #   lib/proxy.ps1        — 代理
 #   lib/ui.ps1           — 交互 UI
-#   lib/bootstrap.ps1    — PS5.1 引导
 #   lib/shim.ps1         — windots 注册
 #   lib/scoop.ps1        — Scoop
 #   lib/backup.ps1       — 备份

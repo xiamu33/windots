@@ -8,6 +8,22 @@ $Global:WindotsMessages = $null
 $Global:WindotsMessagesFallback = $null
 $Global:WindotsLocale = $Script:WindotsDefaultLocale
 
+# 以 UTF-8 无 BOM 读取消息目录（PS5.1 下 Import-PowerShellDataFile 可能误判编码）
+function Import-WindotsMessageCatalog {
+    param([Parameter(Mandatory)][string] $Path)
+    if (-not (Test-Path $Path)) { return @{} }
+    $bytes = [IO.File]::ReadAllBytes($Path)
+    $offset = 0
+    if ($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF) {
+        $offset = 3
+    }
+    $utf8 = [Text.UTF8Encoding]::new($false)
+    $text = $utf8.GetString($bytes, $offset, $bytes.Length - $offset)
+    $data = Invoke-Expression $text
+    if ($data -is [hashtable]) { return $data }
+    return @{}
+}
+
 # 加载 i18n 目录。优先级：$Language 参数 > settings.psd1 Language > 系统区域 > 回退 en-US
 function Initialize-I18n {
     param(
@@ -36,7 +52,7 @@ function Initialize-I18n {
     $Global:WindotsLocale = $locale
 
     if (Test-Path $catalogPath) {
-        $Global:WindotsMessages = Import-PowerShellDataFile -Path $catalogPath
+        $Global:WindotsMessages = Import-WindotsMessageCatalog -Path $catalogPath
     }
     else {
         $Global:WindotsMessages = @{}
@@ -46,7 +62,7 @@ function Initialize-I18n {
     if ($locale -ne $Script:WindotsDefaultLocale) {
         $fallbackPath = Join-Path $i18nDir "$($Script:WindotsDefaultLocale).psd1"
         if (Test-Path $fallbackPath) {
-            $Global:WindotsMessagesFallback = Import-PowerShellDataFile -Path $fallbackPath
+            $Global:WindotsMessagesFallback = Import-WindotsMessageCatalog -Path $fallbackPath
         }
     }
     else {

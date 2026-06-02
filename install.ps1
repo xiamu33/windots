@@ -1,28 +1,23 @@
-﻿# =====================================================================
-# Windots 单命令安装器 (install.ps1)
-# PS5.1 兼容、自包含、不依赖 lib/
+# =====================================================================
+# Windots one-shot installer (install.ps1)
+# PS 5.1 compatible, self-contained, no lib/ dependency
+# Encoding: UTF-8 without BOM; source must be ASCII-only (no CJK in this file)
 #
-# 用法（从网络直接执行）：
+# Remote:
 #   irm https://raw.githubusercontent.com/xiamu33/windots/main/install.ps1 | iex
 #
-# 或本地执行（指定参数透传给 setup.ps1）：
+# Local (forwards -WhatIf / -Reconfigure to setup.ps1):
 #   .\install.ps1
 #   .\install.ps1 -Branch dev -WhatIf
 # =====================================================================
 
 [CmdletBinding()]
 param(
-    # 安装目标目录，默认 ~/.local/share/windots
     [string] $InstallDir = '',
-    # GitHub 分支
     [string] $Branch = 'main',
-    # 代理地址（留空则询问）
     [string] $ProxyUrl = '',
-    # 跳过代理询问
     [switch] $NoProxyPrompt,
-    # 预演模式（透传给 setup.ps1）
     [switch] $WhatIf,
-    # 强制重跑交互（透传给 setup.ps1）
     [switch] $Reconfigure
 )
 
@@ -36,81 +31,124 @@ try {
 }
 catch { }
 
-# ──────────────────────────────────────────────────────────────────────
-# 极简日志（不依赖 lib/logging.ps1）
-# ──────────────────────────────────────────────────────────────────────
 function _Info { param([string]$m) Write-Host "[INFO] $m"  -ForegroundColor Cyan }
 function _Ok { param([string]$m) Write-Host "[OK]   $m"  -ForegroundColor Green }
 function _Warn { param([string]$m) Write-Host "[WARN] $m"  -ForegroundColor Yellow }
 function _Err { param([string]$m) Write-Host "[ERR]  $m"  -ForegroundColor Red }
 function _Step { param([string]$m) Write-Host "[STEP] $m"  -ForegroundColor Magenta }
 
-# ──────────────────────────────────────────────────────────────────────
-# 目标路径
-# ──────────────────────────────────────────────────────────────────────
-$WindotsHome = if ($InstallDir) {
-    $InstallDir
+function _Refresh-Path {
+    $m = [System.Environment]::GetEnvironmentVariable('Path', 'Machine')
+    $u = [System.Environment]::GetEnvironmentVariable('Path', 'User')
+    $env:Path = "$m;$u"
 }
-else {
-    Join-Path $HOME '.local\share\windots'
+
+function _Ensure-Pwsh {
+    if ($null -ne (Get-Command 'pwsh' -ErrorAction SilentlyContinue)) {
+        _Ok 'PowerShell 7 (pwsh) is already installed'
+        return $true
+    }
+    if ($null -eq (Get-Command 'winget' -ErrorAction SilentlyContinue)) {
+        _Err 'winget is not available; cannot install PowerShell 7'
+        return $false
+    }
+    if ($WhatIf) {
+        _Info '[WhatIf] winget install --id Microsoft.PowerShell --source winget'
+        return $true
+    }
+    _Info 'Installing PowerShell 7 via winget...'
+    & winget install --id Microsoft.PowerShell --source winget
+    if ($LASTEXITCODE -ne 0) {
+        _Err "Failed to install PowerShell 7 (exit=$LASTEXITCODE)"
+        return $false
+    }
+    _Refresh-Path
+    if ($null -eq (Get-Command 'pwsh' -ErrorAction SilentlyContinue)) {
+        _Err 'PowerShell 7 was installed but pwsh is not on PATH; open a new terminal and re-run install.ps1'
+        return $false
+    }
+    _Ok 'PowerShell 7 installed'
+    return $true
 }
+
+function _Ensure-Git {
+    if ($null -ne (Get-Command 'git' -ErrorAction SilentlyContinue)) {
+        _Ok 'Git is already installed'
+        return $true
+    }
+    if ($null -eq (Get-Command 'winget' -ErrorAction SilentlyContinue)) {
+        _Err 'winget is not available; cannot install Git'
+        return $false
+    }
+    if ($WhatIf) {
+        _Info '[WhatIf] winget install --id Git.Git --source winget --accept-package-agreements --accept-source-agreements'
+        return $true
+    }
+    _Info 'Installing Git via winget...'
+    & winget install --id Git.Git --source winget --accept-package-agreements --accept-source-agreements
+    if ($LASTEXITCODE -ne 0) {
+        _Err "Failed to install Git (exit=$LASTEXITCODE)"
+        return $false
+    }
+    _Refresh-Path
+    if ($null -eq (Get-Command 'git' -ErrorAction SilentlyContinue)) {
+        _Warn 'Git was installed but git is not on PATH yet; zip fallback may still work'
+        return $true
+    }
+    _Ok 'Git installed'
+    return $true
+}
+
+$WindotsHome = if ($InstallDir) { $InstallDir } else { Join-Path $HOME '.local\share\windots' }
 
 $RepoUrl = 'https://github.com/xiamu33/windots'
 $ZipUrl = "https://github.com/xiamu33/windots/archive/refs/heads/$Branch.zip"
 
 _Step '=== Windots Installer ==='
-_Info "目标目录：$WindotsHome"
-_Info "分支：$Branch"
+_Info "Install dir: $WindotsHome"
+_Info "Branch: $Branch"
 _Info ''
 
-# ──────────────────────────────────────────────────────────────────────
-# 代理配置
-# ──────────────────────────────────────────────────────────────────────
 if (-not $NoProxyPrompt -and [string]::IsNullOrWhiteSpace($ProxyUrl)) {
-    $ans = Read-Host '是否配置代理以加速 GitHub 访问？ [y/N]'
+    $ans = Read-Host 'Configure a proxy for GitHub? [y/N]'
     if ($ans -match '^[yY]') {
-        $ProxyUrl = (Read-Host '代理地址（如 http://127.0.0.1:10808）').Trim()
+        $ProxyUrl = (Read-Host 'Proxy URL (e.g. http://127.0.0.1:10808)').Trim()
     }
 }
 if (-not [string]::IsNullOrWhiteSpace($ProxyUrl)) {
     $env:HTTP_PROXY = $ProxyUrl
     $env:HTTPS_PROXY = $ProxyUrl
     $env:ALL_PROXY = $ProxyUrl
-    _Info "已设置代理：$ProxyUrl"
+    _Info "Proxy set: $ProxyUrl"
 }
 
-# ──────────────────────────────────────────────────────────────────────
-# 下载/更新仓库
-# ──────────────────────────────────────────────────────────────────────
 $gitAvail = $null -ne (Get-Command 'git' -ErrorAction SilentlyContinue)
 $isRepo = $gitAvail -and (Test-Path (Join-Path $WindotsHome '.git'))
 
 if ($isRepo) {
-    # 已是 git 仓库：直接 pull
-    _Step '--- 更新已有仓库 ---'
+    _Step '--- Update existing repo ---'
     if ($WhatIf) {
         _Info "[WhatIf] git -C `"$WindotsHome`" pull"
     }
     else {
         & git -C $WindotsHome pull
         if ($LASTEXITCODE -ne 0) {
-            _Warn "git pull 失败（exit=$LASTEXITCODE），继续使用现有版本..."
+            _Warn "git pull failed (exit=$LASTEXITCODE); continuing with existing tree..."
         }
         else {
-            _Ok '仓库已更新'
+            _Ok 'Repository updated'
         }
     }
 }
 elseif ($gitAvail) {
-    # git 可用：clone
-    _Step '--- git clone 仓库 ---'
+    _Step '--- git clone ---'
     if (Test-Path $WindotsHome) {
-        _Warn "目标目录已存在但不是 git 仓库：$WindotsHome"
-        _Warn '将备份后重新 clone...'
+        _Warn "Target exists but is not a git repo: $WindotsHome"
+        _Warn 'Will back up and clone again...'
         if (-not $WhatIf) {
             $bak = $WindotsHome + '.bak.' + (Get-Date).ToString('yyyyMMddHHmmss')
             Rename-Item -Path $WindotsHome -NewName $bak -Force
-            _Ok "已备份至：$bak"
+            _Ok "Backed up to: $bak"
         }
     }
     if ($WhatIf) {
@@ -121,18 +159,17 @@ elseif ($gitAvail) {
         if (-not (Test-Path $parentDir)) { New-Item -ItemType Directory -Path $parentDir -Force | Out-Null }
         & git clone $RepoUrl $WindotsHome
         if ($LASTEXITCODE -ne 0) {
-            _Err "git clone 失败 (exit=$LASTEXITCODE)，请检查网络或代理设置"
+            _Err "git clone failed (exit=$LASTEXITCODE); check network or proxy"
             exit 1
         }
-        _Ok "仓库已 clone 到：$WindotsHome"
+        _Ok "Cloned to: $WindotsHome"
     }
 }
 else {
-    # git 不可用：zip 回退
-    _Step '--- 下载 zip 包（git 不可用）---'
-    _Info "下载：$ZipUrl"
+    _Step '--- Download zip (git not available) ---'
+    _Info "URL: $ZipUrl"
     if ($WhatIf) {
-        _Info "[WhatIf] Invoke-WebRequest $ZipUrl → 解压到 $WindotsHome"
+        _Info "[WhatIf] Invoke-WebRequest $ZipUrl -> extract to $WindotsHome"
     }
     else {
         $tmpZip = Join-Path $env:TEMP 'windots-install.zip'
@@ -142,18 +179,17 @@ else {
             Invoke-WebRequest -Uri $ZipUrl -OutFile $tmpZip -UseBasicParsing
         }
         catch {
-            _Err "下载失败：$($_.Exception.Message)"
-            _Warn '请安装 git 后重试，或手动下载：https://github.com/xiamu33/windots'
+            _Err "Download failed: $($_.Exception.Message)"
+            _Warn 'Install git and retry, or download manually: https://github.com/xiamu33/windots'
             exit 1
         }
 
         if (Test-Path $tmpDir) { Remove-Item $tmpDir -Recurse -Force }
         Expand-Archive -Path $tmpZip -DestinationPath $tmpDir -Force
 
-        # zip 解压后目录名为 windots-<branch>
         $extractedDir = Get-ChildItem -Path $tmpDir -Directory | Select-Object -First 1
         if (-not $extractedDir) {
-            _Err 'zip 包解压失败，未找到解压目录'
+            _Err 'Zip extract failed: no top-level directory found'
             exit 1
         }
 
@@ -162,24 +198,25 @@ else {
         if (Test-Path $WindotsHome) {
             $bak = $WindotsHome + '.bak.' + (Get-Date).ToString('yyyyMMddHHmmss')
             Rename-Item -Path $WindotsHome -NewName $bak -Force
-            _Ok "已备份旧目录：$bak"
+            _Ok "Backed up old dir: $bak"
         }
         Move-Item -Path $extractedDir.FullName -Destination $WindotsHome -Force
 
-        Remove-Item $tmpZip  -Force -ErrorAction SilentlyContinue
-        Remove-Item $tmpDir  -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-Item $tmpZip -Force -ErrorAction SilentlyContinue
+        Remove-Item $tmpDir -Recurse -Force -ErrorAction SilentlyContinue
 
-        _Ok "仓库已安装到：$WindotsHome"
+        _Ok "Installed to: $WindotsHome"
     }
 }
 
-# ──────────────────────────────────────────────────────────────────────
-# 执行 setup.ps1
-# ──────────────────────────────────────────────────────────────────────
-_Step '--- 启动 setup.ps1 ---'
+_Step '--- Ensure PowerShell 7 and Git ---'
+if (-not (_Ensure-Pwsh)) { exit 1 }
+if (-not (_Ensure-Git)) { exit 1 }
+
+_Step '--- Start setup.ps1 ---'
 $setupScript = Join-Path $WindotsHome 'setup.ps1'
 if (-not (Test-Path $setupScript)) {
-    _Err "找不到 setup.ps1：$setupScript"
+    _Err "setup.ps1 not found: $setupScript"
     exit 1
 }
 
@@ -187,16 +224,17 @@ $fwdArgs = [System.Collections.Generic.List[string]]::new()
 if ($WhatIf) { $fwdArgs.Add('-WhatIf') }
 if ($Reconfigure) { $fwdArgs.Add('-Reconfigure') }
 
-_Info "执行：pwsh -File `"$setupScript`" $($fwdArgs -join ' ')"
+_Info "Running: pwsh -File `"$setupScript`" $($fwdArgs -join ' ')"
 
 if ($WhatIf) {
-    _Info '[WhatIf] 跳过实际执行 setup.ps1'
+    _Info '[WhatIf] skip running setup.ps1'
+    exit 0
 }
-else {
-    if ($null -ne (Get-Command 'pwsh' -ErrorAction SilentlyContinue)) {
-        & pwsh -ExecutionPolicy Bypass -File $setupScript @fwdArgs
-    }
-    else {
-        & powershell -ExecutionPolicy Bypass -File $setupScript @fwdArgs
-    }
+
+if ($null -eq (Get-Command 'pwsh' -ErrorAction SilentlyContinue)) {
+    _Err 'pwsh is required but not found on PATH'
+    exit 1
 }
+
+& pwsh -ExecutionPolicy Bypass -File $setupScript @fwdArgs
+exit $LASTEXITCODE

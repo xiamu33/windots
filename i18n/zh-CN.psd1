@@ -1,4 +1,4 @@
-﻿# =====================================================================
+# =====================================================================
 # Windots 消息目录 - 简体中文 (i18n/zh-CN.psd1)
 # =====================================================================
 @{
@@ -19,15 +19,6 @@
     'ui.single.hint'                     = '  ↑/↓ 移动  Enter 确认'
     'ui.yesno.invalid'                   = '请输入 y 或 n'
     'ui.text.default'                    = '{0} (默认: {1})'
-
-    # --- Bootstrap ---
-    'bootstrap.title'                    = '=== Bootstrap：PowerShell 5.1 引导 ==='
-    'bootstrap.warn'                     = '当前在 PowerShell 5.1 中运行。将先安装 PowerShell 7，再在新窗口继续执行。'
-    'bootstrap.proxy.prompt'             = '安装 PowerShell 7 时是否使用代理（访问 GitHub）？'
-    'bootstrap.proxy.url'                = '代理地址'
-    'bootstrap.ps7.fail'                 = '无法安装 PowerShell 7，退出。'
-    'bootstrap.launching'                = '正在启动 PowerShell 7 窗口继续执行...'
-    'bootstrap.launched'                 = 'PowerShell 7 窗口已启动，本窗口可以关闭。'
 
     # --- Git ---
     'git.installed'                      = 'git 已安装，跳过'
@@ -173,9 +164,7 @@
     'link.src.skip'                      = '源不存在，跳过：{0}'
 
     # --- 主流程 ---
-    'setup.ps5.switching'                = '当前在 PowerShell 5.1 中运行，切换到 pwsh 7 继续...'
-    'setup.git.step'                     = '--- 检测基础依赖：git ---'
-    'setup.deps.ready'                   = '基础依赖就绪，准备进入交互配置...'
+    'setup.ps7.required'                = "Windots setup 需要 PowerShell 7+（pwsh）。`n请先运行 install.ps1，或使用：pwsh -File setup.ps1"
     'setup.state.title'                  = '=== 发现已保存的配置 ==='
     'setup.state.timestamp'              = '上次保存时间 : {0}'
     'setup.state.proxy'                  = '代理         : {0}'
