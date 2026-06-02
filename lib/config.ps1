@@ -31,6 +31,75 @@ function Resolve-DestPath {
     return $Dest
 }
 
+# packages.psd1 Desc 字段解析
+# 字符串 Desc：任意语言通用
+# 对象 Desc：当前语言 Desc > i18n 当前语言 > 默认语言 Desc > i18n 默认语言
+# 无 Desc：i18n 当前语言 > i18n 默认语言
+function Get-PackageI18nDesc {
+    param(
+        [Parameter(Mandatory)][string] $Name,
+        [ValidateSet('Any', 'Primary', 'Fallback')]
+        [string] $Scope = 'Any'
+    )
+
+    $descKey = "pkg.$Name.desc"
+    if ($Scope -in 'Any', 'Primary') {
+        if ($null -ne $Global:WindotsMessages -and $Global:WindotsMessages.ContainsKey($descKey)) {
+            return [string]$Global:WindotsMessages[$descKey]
+        }
+    }
+    if ($Scope -in 'Any', 'Fallback') {
+        if ($null -ne $Global:WindotsMessagesFallback -and $Global:WindotsMessagesFallback.ContainsKey($descKey)) {
+            return [string]$Global:WindotsMessagesFallback[$descKey]
+        }
+    }
+    return ''
+}
+
+function Get-PackageDesc {
+    param(
+        [Parameter(Mandatory)]
+        $Package
+    )
+
+    $name = [string]$Package.Name
+    if ([string]::IsNullOrWhiteSpace($name)) { return '' }
+
+    $locale = [string]$Global:WindotsLocale
+    $defaultLocale = $Script:WindotsDefaultLocale
+
+    if ($Package.Contains('Desc') -and $null -ne $Package.Desc) {
+        $desc = $Package.Desc
+        if ($desc -is [string]) {
+            $text = $desc.Trim()
+            if ($text) { return $text }
+        }
+        elseif ($desc -is [System.Collections.IDictionary]) {
+            if ($desc.Contains($locale)) {
+                $text = [string]$desc[$locale]
+                if (-not [string]::IsNullOrWhiteSpace($text)) { return $text.Trim() }
+            }
+
+            $primaryI18n = Get-PackageI18nDesc -Name $name -Scope Primary
+            if ($primaryI18n) { return $primaryI18n }
+
+            if ($locale -ne $defaultLocale -and $desc.Contains($defaultLocale)) {
+                $text = [string]$desc[$defaultLocale]
+                if (-not [string]::IsNullOrWhiteSpace($text)) { return $text.Trim() }
+            }
+
+            $fallbackI18n = Get-PackageI18nDesc -Name $name -Scope Fallback
+            if ($fallbackI18n) { return $fallbackI18n }
+
+            return ''
+        }
+    }
+
+    $i18nDesc = Get-PackageI18nDesc -Name $name
+    if ($i18nDesc) { return $i18nDesc }
+    return ''
+}
+
 function ConvertTo-PsLiteral {
     param([object] $Value)
     if ($null -eq $Value) { return '$null' }

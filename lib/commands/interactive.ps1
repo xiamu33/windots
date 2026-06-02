@@ -55,9 +55,8 @@ function Invoke-Interactive {
 
     $pkgSuffix = {
         param($x)
-        $descKey = "pkg.$([string]$x.Name).desc"
-        $desc = msg $descKey
-        if ($desc -ne $descKey) { " ($desc)" } else { '' }
+        $desc = Get-PackageDesc -Package $x
+        if ($desc) { " ($desc)" } else { '' }
     }
 
     $getLockedNames = {
