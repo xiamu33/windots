@@ -224,7 +224,7 @@ $fwdArgs = [System.Collections.Generic.List[string]]::new()
 if ($WhatIf) { $fwdArgs.Add('-WhatIf') }
 if ($Reconfigure) { $fwdArgs.Add('-Reconfigure') }
 
-_Info "Running: pwsh -File `"$setupScript`" $($fwdArgs -join ' ')"
+_Info "Running: pwsh -NoProfile -ExecutionPolicy Bypass -File `"$setupScript`" $($fwdArgs -join ' ')"
 
 if ($WhatIf) {
     _Info '[WhatIf] skip running setup.ps1'
@@ -236,5 +236,5 @@ if ($null -eq (Get-Command 'pwsh' -ErrorAction SilentlyContinue)) {
     exit 1
 }
 
-& pwsh -ExecutionPolicy Bypass -File $setupScript @fwdArgs
+& pwsh -NoProfile -ExecutionPolicy Bypass -File $setupScript @fwdArgs
 exit $LASTEXITCODE
