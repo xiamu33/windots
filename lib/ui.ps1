@@ -128,8 +128,8 @@ function Select-Items {
 
         $key = [Console]::ReadKey($true)
         switch ($key.Key) {
-            ('UpArrow', 'K') { if ($cursor -gt 0) { $cursor-- } }
-            ('DownArrow', 'J') { if ($cursor -lt $Items.Count - 1) { $cursor++ } }
+            { $_ -in @('UpArrow', 'K') } { $cursor = ($cursor - 1 + $Items.Count) % $Items.Count }
+            { $_ -in @('DownArrow', 'J') } { $cursor = ($cursor + 1) % $Items.Count }
             'Spacebar' {
                 $lbl = & $Labeler $Items[$cursor]
                 if ($Disabled -notcontains $lbl -and $Locked -notcontains $lbl) {
@@ -184,8 +184,8 @@ function Select-One {
         }
         $key = [Console]::ReadKey($true)
         switch ($key.Key) {
-            ('UpArrow', 'K') { if ($cursor -gt 0) { $cursor-- } }
-            ('DownArrow', 'J') { if ($cursor -lt $Items.Count - 1) { $cursor++ } }
+            { $_ -in @('UpArrow', 'K') } { $cursor = ($cursor - 1 + $Items.Count) % $Items.Count }
+            { $_ -in @('DownArrow', 'J') } { $cursor = ($cursor + 1) % $Items.Count }
             'Enter' { return $Items[$cursor] }
         }
     }
