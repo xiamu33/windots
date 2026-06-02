@@ -1,0 +1,215 @@
+﻿# =====================================================================
+# Windots 消息目录 - 简体中文 (i18n/zh-CN.psd1)
+# =====================================================================
+@{
+    # --- 配置文件 ---
+    'config.notfound'                    = '找不到数据文件: {0}'
+
+    # --- 环境检测 ---
+    'detect.winget.loading'              = '正在获取 winget 已安装列表（首次稍慢）...'
+
+    # --- 代理 ---
+    'proxy.set'                          = '已为当前会话设置代理：{0}'
+
+    # --- 交互 UI ---
+    'ui.empty'                           = '{0} : 无可选项，跳过'
+    'ui.select.hint'                     = '  ↑/↓ 移动  空格 切换  A 全选  N 全不选  Enter 确认  Esc 取消'
+    'ui.select.installed'                = '[已安装]'
+    'ui.select.unsupported'              = '[暂不支持]'
+    'ui.single.hint'                     = '  ↑/↓ 移动  Enter 确认'
+    'ui.yesno.invalid'                   = '请输入 y 或 n'
+    'ui.text.default'                    = '{0} (默认: {1})'
+
+    # --- Bootstrap ---
+    'bootstrap.title'                    = '=== Bootstrap：PowerShell 5.1 引导 ==='
+    'bootstrap.warn'                     = '当前在 PowerShell 5.1 中运行。将先安装 PowerShell 7，再在新窗口继续执行。'
+    'bootstrap.proxy.prompt'             = '安装 PowerShell 7 时是否使用代理（访问 GitHub）？'
+    'bootstrap.proxy.url'                = '代理地址'
+    'bootstrap.ps7.fail'                 = '无法安装 PowerShell 7，退出。'
+    'bootstrap.launching'                = '正在启动 PowerShell 7 窗口继续执行...'
+    'bootstrap.launched'                 = 'PowerShell 7 窗口已启动，本窗口可以关闭。'
+
+    # --- Git ---
+    'git.installed'                      = 'git 已安装，跳过'
+    'git.winget.unavail'                 = 'winget 不可用，无法安装 git'
+    'git.installing'                     = '正在通过 winget 安装 git...'
+    'git.fail'                           = 'git 安装失败 (exit={0})'
+    'git.ok'                             = 'git 安装完成'
+
+    # --- PowerShell 7 ---
+    'ps7.installed'                      = 'PowerShell 7 已安装，跳过'
+    'ps7.winget.unavail'                 = 'winget 不可用。请在 Microsoft Store 安装「应用安装程序」后重试。'
+    'ps7.installing'                     = '正在通过 winget 安装 PowerShell 7...'
+    'ps7.fail'                           = 'PowerShell 7 安装失败 (exit={0})'
+    'ps7.ok'                             = 'PowerShell 7 安装完成'
+
+    # --- Shim ---
+    'shim.notfound'                      = '找不到 shim 源文件：{0}，跳过 windots 注册'
+    'shim.copied'                        = 'windots.cmd 已复制到 {0}'
+    'shim.path.added'                    = '已将 {0} 加入用户 PATH'
+    'shim.path.reopen'                   = '请重开 PowerShell 窗口后 windots 命令才生效'
+    'shim.available'                     = 'windots 已在 PATH 中可用'
+
+    # --- Scoop ---
+    'scoop.installed'                    = 'scoop 已安装，跳过'
+    'scoop.admin.err'                    = 'scoop 不能在管理员窗口中安装。请使用普通用户 PowerShell 窗口重新运行。'
+    'scoop.installing'                   = '正在安装 scoop（来源：{0}）...'
+    'scoop.mirror.already'               = 'scoop 镜像已是 gitee，跳过'
+    'scoop.mirror.switching'             = '正在切换 scoop 到 gitee 镜像...'
+    'scoop.mirror.done'                  = 'scoop 镜像已切换'
+    'scoop.app.installed'                = 'scoop: {0} 已安装，跳过'
+    'scoop.app.installing'               = '正在通过 scoop 安装：{0}'
+    'scoop.app.fail'                     = 'scoop 安装失败：{0} (exit={1})'
+    'scoop.app.ok'                       = 'scoop: {0} 安装完成'
+
+    # --- 备份 ---
+    'backup.dir.zip'                     = '目录已备份为 zip：{0}'
+    'backup.file.bak'                    = '文件已备份：{0}'
+
+    # --- 链接 ---
+    'links.hardlink.ok'                  = '硬链接：{0} ⇄ {1}'
+    'links.hardlink.fail'                = '硬链接失败（{0}），尝试符号链接...'
+    'links.symlink.ok'                   = '符号链接：{0} → {1}'
+    'links.symlink.fail.fallback'        = '符号链接失败（{0}），改为复制...'
+    'links.symlink.fail'                 = '创建符号链接失败：{0} ({1})'
+    'links.copy.ok'                      = '已复制：{0} ← {1}'
+    'links.copy.fail'                    = '复制失败：{0} ({1})'
+    'links.src.missing'                  = '源不存在，跳过：{0}'
+    'links.dest.ok'                      = '链接已正确：{0}'
+    'links.dest.hardlink.ok'             = '硬链接已正确：{0}'
+    'links.dest.keep'                    = '保留原配置，跳过：{0}'
+    'links.dir.no.hardlink'              = '目录无法硬链接，尝试符号链接：{0}'
+    'links.symlink.devmode.title'        = '=== 需要开发者模式或管理员权限才能创建符号链接 ==='
+    'links.symlink.devmode.guide1'       = '请前往：设置 → 隐私与安全性 → 开发者专用 → 开启「开发人员模式」'
+    'links.symlink.devmode.guide2'       = '开启后按 R 重试检测，或按 C 改为复制文件模式'
+    'links.symlink.devmode.ok'           = '已检测到开发者模式，使用符号链接'
+    'links.symlink.devmode.retry'        = '未检测到开发者模式，请确认已开启后再按 R'
+    'links.symlink.copy.chosen'          = '已选择复制模式，所有配置文件将使用复制方式应用'
+
+    # --- Doctor ---
+    'doctor.title'                       = '=== windots doctor ==='
+    'doctor.ps.name'                     = 'PowerShell 版本'
+    'doctor.ps.warn.suffix'              = ' (建议升级到 7+)'
+    'doctor.scoop.name'                  = 'scoop'
+    'doctor.scoop.installed'             = '已安装'
+    'doctor.scoop.missing'               = '未找到'
+    'doctor.git.name'                    = 'git'
+    'doctor.git.installed'               = '已安装'
+    'doctor.git.missing'                 = '未找到'
+    'doctor.windots.name'                = 'windots.cmd'
+    'doctor.windots.missing'             = '未注册，运行 windots install 重新安装'
+    'doctor.state.name'                  = 'state 文件'
+    'doctor.state.missing'               = '不存在，首次运行会自动创建'
+
+    # --- 运行总结 ---
+    'summary.title'                      = '=== 运行总结 ==='
+    'summary.done'                       = '完成: {0} 成功  {1} 跳过  {2} 失败'
+    'summary.log'                        = '详细日志：{0}'
+
+    # --- 交互配置 ---
+    'interactive.title'                  = '=== Windots 交互配置 ==='
+    'interactive.repo'                   = '仓库目录：{0}'
+    'interactive.log'                    = '日志文件：{0}'
+    'interactive.step.proxy'             = '--- 1/6 代理配置 ---'
+    'interactive.proxy.desc'             = '国内访问 GitHub 可能较慢，可配置代理加速安装。'
+    'interactive.proxy.prompt'           = '是否使用代理？'
+    'interactive.proxy.url.prompt'       = '代理地址 (默认 http://127.0.0.1:10808)'
+    'interactive.step.pkgmgr'            = '--- 2/6 包管理器 ---'
+    'interactive.pkgmgr.title'           = '选择包管理器：'
+    'interactive.step.mirror'            = '--- 3/6 Scoop 镜像 ---'
+    'interactive.mirror.desc'            = '切换到 gitee 镜像可加快 scoop 本体和 bucket 的下载速度。'
+    'interactive.mirror.prompt'          = '是否切换 scoop 到 gitee 国内镜像？'
+    'interactive.step.packages'          = '--- 4/6 选择安装包 ---'
+    'interactive.packages.rec.title'     = '推荐安装（默认全选）：'
+    'interactive.packages.dev.title'     = '可选 - 开发环境：'
+    'interactive.packages.term.title'    = '可选 - 终端工具：'
+    'interactive.packages.beauty.title'  = '可选 - 美化工具：'
+    'interactive.step.chezmoi'           = '--- 5/6 chezmoi 配置同步 ---'
+    'interactive.chezmoi.prompt'         = '是否使用 chezmoi 同步跨平台配置（nvim/starship/wezterm 等）？'
+    'interactive.chezmoi.user.prompt'    = 'GitHub 用户名'
+    'interactive.chezmoi.apply.prompt'   = '是否立即 --apply（拉取并应用配置）？'
+    'interactive.step.config'            = '--- 6/6 配置文件应用方式 ---'
+    'interactive.conflict.title'         = '已存在的配置文件如何处理？'
+    'interactive.conflict.overwrite'     = '直接覆盖（默认）'
+    'interactive.conflict.backup'        = '备份后覆盖'
+    'interactive.conflict.keep'          = '保留原文件'
+    'interactive.linkmode.title'         = '如何应用配置文件？'
+    'interactive.linkmode.hardlink'      = '硬链接（推荐，需源与目标同盘）'
+    'interactive.linkmode.symlink'       = '软链接'
+    'interactive.linkmode.copy'          = '复制文件'
+    'interactive.plan.title'             = '=== 执行计划摘要 ==='
+    'interactive.plan.proxy'             = '代理      : {0}'
+    'interactive.plan.mirror'            = 'scoop 镜像: {0}'
+    'interactive.plan.packages'          = '安装包    : {0}'
+    'interactive.plan.chezmoi'           = 'chezmoi   : {0}'
+    'interactive.plan.conflict'          = '配置冲突  : {0}'
+    'interactive.plan.linkmode'          = '配置模式  : {0}'
+    'interactive.state.saved'            = '配置已保存：{0}'
+    'interactive.plan.proxy.none'        = '(无)'
+    'interactive.plan.chezmoi.skip'      = '(跳过)'
+    'interactive.plan.mirror.enabled'    = '启用 (gitee)'
+    'interactive.plan.mirror.disabled'   = '禁用'
+
+    # --- 安装流程 ---
+    'install.step.scoop'                 = '--- 安装 scoop ---'
+    'install.scoop.admin.err'            = 'scoop 必须在普通用户窗口安装，当前为管理员窗口，跳过。'
+    'install.step.mirror'                = '--- 切换 scoop 镜像 ---'
+    'install.step.packages'              = '--- 安装 scoop 包 ---'
+    'install.step.config'                = '--- 应用配置文件 ---'
+    'install.config.src.skip'            = '配置源不存在，跳过：{0}'
+    'install.step.chezmoi'               = '--- 初始化 chezmoi ---'
+    'install.chezmoi.missing'            = 'chezmoi 未找到，跳过（请确认已在包列表中选择 chezmoi）'
+    'install.chezmoi.init'               = 'chezmoi init {0}/{1}'
+
+    # --- 更新 ---
+    'update.title'                       = '=== windots update ==='
+    'update.scoop.missing'               = 'scoop 未安装，跳过包更新'
+    'update.scoop.running'               = '更新所有 scoop 包...'
+    'update.chezmoi.running'             = '更新 chezmoi 配置...'
+    'update.done'                        = 'update 完成'
+
+    # --- 链接重建 ---
+    'link.title'                         = '=== windots link ==='
+    'link.src.skip'                      = '源不存在，跳过：{0}'
+
+    # --- 主流程 ---
+    'setup.ps5.switching'                = '当前在 PowerShell 5.1 中运行，切换到 pwsh 7 继续...'
+    'setup.git.step'                     = '--- 检测基础依赖：git ---'
+    'setup.deps.ready'                   = '基础依赖就绪，准备进入交互配置...'
+    'setup.state.title'                  = '=== 发现已保存的配置 ==='
+    'setup.state.timestamp'              = '上次保存时间 : {0}'
+    'setup.state.proxy'                  = '代理         : {0}'
+    'setup.state.packages'               = '安装包       : {0}'
+    'setup.state.chezmoi'                = 'chezmoi      : {0}'
+    'setup.state.conflict'               = '配置冲突     : {0}'
+    'setup.state.linkmode'               = '配置模式     : {0}'
+    'setup.state.use.prompt'             = '是否使用以上配置直接开始安装？'
+    'setup.state.missing.err'            = '未找到 state 文件，请先运行 windots install 完成初始化'
+    'setup.cmd.unknown'                  = '未知子命令：{0}'
+    'setup.cmd.hint'                     = '可用子命令：install, update, link, doctor'
+
+    # --- 包描述 ---
+    'pkg.fd.desc'                        = '更快的 find 替代'
+    'pkg.bat.desc'                       = '带语法高亮的 cat 替代'
+    'pkg.delta.desc'                     = 'git diff 高亮增强'
+    'pkg.eza.desc'                       = '更好的 ls 替代'
+    'pkg.lsd.desc'                       = '更好的 ls 替代（eza 替代）'
+    'pkg.fzf.desc'                       = '模糊搜索工具'
+    'pkg.jd.desc'                        = 'JSON diff 工具'
+    'pkg.jq.desc'                        = 'JSON 命令行处理器'
+    'pkg.ripgrep.desc'                   = '更快的 grep 替代'
+    'pkg.tldr.desc'                      = '简化版命令手册'
+    'pkg.zoxide.desc'                    = '智能目录跳转（cd 增强）'
+    'pkg.mise.desc'                      = '多语言版本管理器（asdf 替代）'
+    'pkg.fnm.desc'                       = '快速 Node.js 版本管理器'
+    'pkg.pnpm.desc'                      = '高效的 Node.js 包管理器'
+    'pkg.lazygit.desc'                   = 'Git TUI 客户端'
+    'pkg.neovim.desc'                    = '基于 Vim 的现代编辑器'
+    'pkg.yazi.desc'                      = '终端文件管理器'
+    'pkg.zellij.desc'                    = '终端多路复用器'
+    'pkg.starship.desc'                  = '跨 shell 提示符'
+    'pkg.glazewm.desc'                   = 'Windows 平铺式窗口管理器'
+    'pkg.zebar.desc'                     = 'Windows 状态栏'
+    'pkg.yasb.desc'                      = 'Windows 状态栏'
+    'pkg.flow-launcher.desc'             = '应用启动器'
+}

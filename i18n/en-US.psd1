@@ -1,0 +1,215 @@
+﻿# =====================================================================
+# Windots Message Catalog - English (i18n/en-US.psd1)
+# =====================================================================
+@{
+    # --- Config ---
+    'config.notfound'                    = 'Data file not found: {0}'
+
+    # --- Detection ---
+    'detect.winget.loading'              = 'Fetching winget installed packages list (first time may be slow)...'
+
+    # --- Proxy ---
+    'proxy.set'                          = 'Session proxy set: {0}'
+
+    # --- Interactive UI ---
+    'ui.empty'                           = '{0}: no items available, skipping'
+    'ui.select.hint'                     = '  Up/Down Move  Space Toggle  A Select All  N Deselect All  Enter Confirm  Esc Cancel'
+    'ui.select.installed'                = '[installed]'
+    'ui.select.unsupported'              = '[unsupported]'
+    'ui.single.hint'                     = '  Up/Down Move  Enter Confirm'
+    'ui.yesno.invalid'                   = 'Please enter y or n'
+    'ui.text.default'                    = '{0} (default: {1})'
+
+    # --- Bootstrap ---
+    'bootstrap.title'                    = '=== Bootstrap: PowerShell 5.1 Setup ==='
+    'bootstrap.warn'                     = 'Currently running in PowerShell 5.1. Will install PowerShell 7 first, then continue in a new window.'
+    'bootstrap.proxy.prompt'             = 'Use a proxy to install PowerShell 7 (accessing GitHub)?'
+    'bootstrap.proxy.url'                = 'Proxy URL'
+    'bootstrap.ps7.fail'                 = 'Failed to install PowerShell 7. Exiting.'
+    'bootstrap.launching'                = 'Launching PowerShell 7 window to continue...'
+    'bootstrap.launched'                 = 'PowerShell 7 window launched. This window can be closed.'
+
+    # --- Git ---
+    'git.installed'                      = 'git is already installed, skipping'
+    'git.winget.unavail'                 = 'winget is unavailable, cannot install git'
+    'git.installing'                     = 'Installing git via winget...'
+    'git.fail'                           = 'git installation failed (exit={0})'
+    'git.ok'                             = 'git installation complete'
+
+    # --- PowerShell 7 ---
+    'ps7.installed'                      = 'PowerShell 7 is already installed, skipping'
+    'ps7.winget.unavail'                 = 'winget is unavailable. Please install App Installer from Microsoft Store and retry.'
+    'ps7.installing'                     = 'Installing PowerShell 7 via winget...'
+    'ps7.fail'                           = 'PowerShell 7 installation failed (exit={0})'
+    'ps7.ok'                             = 'PowerShell 7 installation complete'
+
+    # --- Shim ---
+    'shim.notfound'                      = 'Shim source not found: {0}, skipping windots registration'
+    'shim.copied'                        = 'windots.cmd copied to {0}'
+    'shim.path.added'                    = 'Added {0} to user PATH'
+    'shim.path.reopen'                   = 'Please reopen PowerShell for windots command to take effect'
+    'shim.available'                     = 'windots is available in PATH'
+
+    # --- Scoop ---
+    'scoop.installed'                    = 'scoop is already installed, skipping'
+    'scoop.admin.err'                    = 'scoop cannot be installed in an admin window. Please run in a regular user PowerShell window.'
+    'scoop.installing'                   = 'Installing scoop (source: {0})...'
+    'scoop.mirror.already'               = 'scoop mirror is already gitee, skipping'
+    'scoop.mirror.switching'             = 'Switching scoop to gitee mirror...'
+    'scoop.mirror.done'                  = 'scoop mirror switched'
+    'scoop.app.installed'                = 'scoop: {0} already installed, skipping'
+    'scoop.app.installing'               = 'Installing via scoop: {0}'
+    'scoop.app.fail'                     = 'scoop install failed: {0} (exit={1})'
+    'scoop.app.ok'                       = 'scoop: {0} installed'
+
+    # --- Backup ---
+    'backup.dir.zip'                     = 'Directory backed up as zip: {0}'
+    'backup.file.bak'                    = 'File backed up: {0}'
+
+    # --- Links ---
+    'links.hardlink.ok'                  = 'Hard link: {0} ⇄ {1}'
+    'links.hardlink.fail'                = 'Hard link failed ({0}), trying symbolic link...'
+    'links.symlink.ok'                   = 'Symbolic link: {0} → {1}'
+    'links.symlink.fail.fallback'        = 'Symbolic link failed ({0}), falling back to copy...'
+    'links.symlink.fail'                 = 'Failed to create symbolic link: {0} ({1})'
+    'links.copy.ok'                      = 'Copied: {0} ← {1}'
+    'links.copy.fail'                    = 'Copy failed: {0} ({1})'
+    'links.src.missing'                  = 'Source missing, skipping: {0}'
+    'links.dest.ok'                      = 'Link already correct: {0}'
+    'links.dest.hardlink.ok'             = 'Hard link already correct: {0}'
+    'links.dest.keep'                    = 'Keeping existing config, skipping: {0}'
+    'links.dir.no.hardlink'              = 'Directory cannot be hard linked, trying symbolic link: {0}'
+    'links.symlink.devmode.title'        = '=== Developer Mode or Admin Required for Symbolic Links ==='
+    'links.symlink.devmode.guide1'       = 'Go to: Settings > Privacy & Security > For Developers > Enable Developer Mode'
+    'links.symlink.devmode.guide2'       = 'Press R to retry detection, or C to use copy mode instead'
+    'links.symlink.devmode.ok'           = 'Developer mode detected, using symbolic links'
+    'links.symlink.devmode.retry'        = 'Developer mode not detected, please enable it first then press R'
+    'links.symlink.copy.chosen'          = 'Copy mode selected, all config files will be copied'
+
+    # --- Doctor ---
+    'doctor.title'                       = '=== windots doctor ==='
+    'doctor.ps.name'                     = 'PowerShell version'
+    'doctor.ps.warn.suffix'              = ' (upgrade to 7+ recommended)'
+    'doctor.scoop.name'                  = 'scoop'
+    'doctor.scoop.installed'             = 'installed'
+    'doctor.scoop.missing'               = 'not found'
+    'doctor.git.name'                    = 'git'
+    'doctor.git.installed'               = 'installed'
+    'doctor.git.missing'                 = 'not found'
+    'doctor.windots.name'                = 'windots.cmd'
+    'doctor.windots.missing'             = 'not registered, run windots install to reinstall'
+    'doctor.state.name'                  = 'state file'
+    'doctor.state.missing'               = 'not found, will be created on first run'
+
+    # --- Summary ---
+    'summary.title'                      = '=== Run Summary ==='
+    'summary.done'                       = 'Done: {0} succeeded  {1} skipped  {2} failed'
+    'summary.log'                        = 'Detailed log: {0}'
+
+    # --- Interactive ---
+    'interactive.title'                  = '=== Windots Interactive Setup ==='
+    'interactive.repo'                   = 'Repo directory: {0}'
+    'interactive.log'                    = 'Log file: {0}'
+    'interactive.step.proxy'             = '--- 1/6 Proxy Configuration ---'
+    'interactive.proxy.desc'             = 'Accessing GitHub from China may be slow. Configure a proxy to speed up installation.'
+    'interactive.proxy.prompt'           = 'Use a proxy?'
+    'interactive.proxy.url.prompt'       = 'Proxy URL (default: http://127.0.0.1:10808)'
+    'interactive.step.pkgmgr'            = '--- 2/6 Package Manager ---'
+    'interactive.pkgmgr.title'           = 'Select package manager:'
+    'interactive.step.mirror'            = '--- 3/6 Scoop Mirror ---'
+    'interactive.mirror.desc'            = 'Switching to gitee mirror speeds up scoop and bucket downloads.'
+    'interactive.mirror.prompt'          = 'Switch scoop to gitee mirror?'
+    'interactive.step.packages'          = '--- 4/6 Select Packages ---'
+    'interactive.packages.rec.title'     = 'Recommended (selected by default):'
+    'interactive.packages.dev.title'     = 'Optional - Development:'
+    'interactive.packages.term.title'    = 'Optional - Terminal Tools:'
+    'interactive.packages.beauty.title'  = 'Optional - Appearance:'
+    'interactive.step.chezmoi'           = '--- 5/6 chezmoi Config Sync ---'
+    'interactive.chezmoi.prompt'         = 'Use chezmoi to sync cross-platform configs (nvim/starship/wezterm etc.)?'
+    'interactive.chezmoi.user.prompt'    = 'GitHub username'
+    'interactive.chezmoi.apply.prompt'   = 'Run --apply immediately (pull and apply config)?'
+    'interactive.step.config'            = '--- 6/6 Config File Application ---'
+    'interactive.conflict.title'         = 'How to handle existing config files?'
+    'interactive.conflict.overwrite'     = 'Overwrite directly (default)'
+    'interactive.conflict.backup'        = 'Backup then overwrite'
+    'interactive.conflict.keep'          = 'Keep existing files'
+    'interactive.linkmode.title'         = 'How to apply config files?'
+    'interactive.linkmode.hardlink'      = 'Hard link (recommended, source and target must be on same drive)'
+    'interactive.linkmode.symlink'       = 'Symbolic link'
+    'interactive.linkmode.copy'          = 'Copy files'
+    'interactive.plan.title'             = '=== Execution Plan Summary ==='
+    'interactive.plan.proxy'             = 'Proxy     : {0}'
+    'interactive.plan.mirror'            = 'scoop mirror: {0}'
+    'interactive.plan.packages'          = 'Packages  : {0}'
+    'interactive.plan.chezmoi'           = 'chezmoi   : {0}'
+    'interactive.plan.conflict'          = 'Conflict  : {0}'
+    'interactive.plan.linkmode'          = 'Link mode : {0}'
+    'interactive.state.saved'            = 'Config saved: {0}'
+    'interactive.plan.proxy.none'        = '(none)'
+    'interactive.plan.chezmoi.skip'      = '(skip)'
+    'interactive.plan.mirror.enabled'    = 'enabled (gitee)'
+    'interactive.plan.mirror.disabled'   = 'disabled'
+
+    # --- Install ---
+    'install.step.scoop'                 = '--- Installing scoop ---'
+    'install.scoop.admin.err'            = 'scoop must be installed in a regular user window, current window is admin, skipping.'
+    'install.step.mirror'                = '--- Switching scoop mirror ---'
+    'install.step.packages'              = '--- Installing scoop packages ---'
+    'install.step.config'                = '--- Applying config files ---'
+    'install.config.src.skip'            = 'Config source missing, skipping: {0}'
+    'install.step.chezmoi'               = '--- Initializing chezmoi ---'
+    'install.chezmoi.missing'            = 'chezmoi not found, skipping (make sure chezmoi is in the package list)'
+    'install.chezmoi.init'               = 'chezmoi init {0}/{1}'
+
+    # --- Update ---
+    'update.title'                       = '=== windots update ==='
+    'update.scoop.missing'               = 'scoop not installed, skipping package update'
+    'update.scoop.running'               = 'Updating all scoop packages...'
+    'update.chezmoi.running'             = 'Updating chezmoi config...'
+    'update.done'                        = 'update complete'
+
+    # --- Link ---
+    'link.title'                         = '=== windots link ==='
+    'link.src.skip'                      = 'Source missing, skipping: {0}'
+
+    # --- Main flow ---
+    'setup.ps5.switching'                = 'Running in PowerShell 5.1, switching to pwsh 7...'
+    'setup.git.step'                     = '--- Checking base dependency: git ---'
+    'setup.deps.ready'                   = 'Base dependencies ready, starting interactive setup...'
+    'setup.state.title'                  = '=== Saved Configuration Found ==='
+    'setup.state.timestamp'              = 'Last saved       : {0}'
+    'setup.state.proxy'                  = 'Proxy            : {0}'
+    'setup.state.packages'               = 'Packages         : {0}'
+    'setup.state.chezmoi'                = 'chezmoi          : {0}'
+    'setup.state.conflict'               = 'Conflict mode    : {0}'
+    'setup.state.linkmode'               = 'Link mode        : {0}'
+    'setup.state.use.prompt'             = 'Use saved configuration to start installation?'
+    'setup.state.missing.err'            = 'State file not found. Please run windots install first.'
+    'setup.cmd.unknown'                  = 'Unknown command: {0}'
+    'setup.cmd.hint'                     = 'Available commands: install, update, link, doctor'
+
+    # --- Package descriptions ---
+    'pkg.fd.desc'                        = 'Faster find alternative'
+    'pkg.bat.desc'                       = 'cat clone with syntax highlighting'
+    'pkg.delta.desc'                     = 'Git diff syntax highlighter'
+    'pkg.eza.desc'                       = 'Modern replacement for ls'
+    'pkg.lsd.desc'                       = 'Modern replacement for ls (eza alternative)'
+    'pkg.fzf.desc'                       = 'Fuzzy finder'
+    'pkg.jd.desc'                        = 'JSON diff tool'
+    'pkg.jq.desc'                        = 'Command-line JSON processor'
+    'pkg.ripgrep.desc'                   = 'Faster grep alternative'
+    'pkg.tldr.desc'                      = 'Simplified man pages'
+    'pkg.zoxide.desc'                    = 'Smarter cd command'
+    'pkg.mise.desc'                      = 'Polyglot version manager (asdf alternative)'
+    'pkg.fnm.desc'                       = 'Fast Node.js version manager'
+    'pkg.pnpm.desc'                      = 'Efficient Node.js package manager'
+    'pkg.lazygit.desc'                   = 'TUI for git'
+    'pkg.neovim.desc'                    = 'Neovim text editor'
+    'pkg.yazi.desc'                      = 'Terminal file manager'
+    'pkg.zellij.desc'                    = 'Terminal multiplexer'
+    'pkg.starship.desc'                  = 'Cross-shell prompt'
+    'pkg.glazewm.desc'                   = 'Windows tiling window manager'
+    'pkg.zebar.desc'                     = 'Windows status bar'
+    'pkg.yasb.desc'                      = 'Windows status bar'
+    'pkg.flow-launcher.desc'             = 'Application launcher'
+}
