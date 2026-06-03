@@ -71,7 +71,10 @@ Register-WindotsShim -RepoRoot $Script:Root -WhatIf:$ctx.WhatIf
 
 # 设置 WINDOTS_ROOT 用户环境变量
 if (-not $ctx.WhatIf) {
-    [System.Environment]::SetEnvironmentVariable('WINDOTS_ROOT', $Script:Root, 'User')
+    $currentRoot = [System.Environment]::GetEnvironmentVariable('WINDOTS_ROOT', 'User')
+    if ($currentRoot -ne $Script:Root) {
+        [System.Environment]::SetEnvironmentVariable('WINDOTS_ROOT', $Script:Root, 'User')
+    }
     $env:WINDOTS_ROOT = $Script:Root
 }
 
