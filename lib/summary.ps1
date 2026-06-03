@@ -15,7 +15,7 @@ function Show-Summary {
     $failed = @($Results | Where-Object { $_.Status -eq 'failed' })
 
     if ($ok.Count -gt 0) {
-        Write-Host ('[OK]    ' + ($ok | ForEach-Object { $_.Label }) -join ', ') -ForegroundColor Green
+        Write-Host ('[OK]   ' + ($ok | ForEach-Object { $_.Label }) -join ', ') -ForegroundColor Green
     }
     if ($skipped.Count -gt 0) {
         Write-Host ('[SKIP]  ' + ($skipped | ForEach-Object { $_.Label }) -join ', ') -ForegroundColor Yellow
@@ -26,4 +26,5 @@ function Show-Summary {
     Write-Host ''
     Write-Info (msg 'summary.done' $ok.Count $skipped.Count $failed.Count)
     if ($LogFile) { Write-Info (msg 'summary.log' $LogFile) }
+    Write-Info (msg 'summary.hint')
 }

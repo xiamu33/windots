@@ -96,6 +96,7 @@
     'summary.title'                      = '=== 运行总结 ==='
     'summary.done'                       = '完成: {0} 成功  {1} 跳过  {2} 失败'
     'summary.log'                        = '详细日志：{0}'
+    'summary.hint'                       = '后续请在新终端使用 windots 命令管理环境（install / update / link / doctor）'
 
     # --- 交互配置 ---
     'interactive.title'                  = '=== Windots 交互配置 ==='

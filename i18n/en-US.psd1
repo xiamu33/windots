@@ -96,6 +96,7 @@
     'summary.title'                      = '=== Run Summary ==='
     'summary.done'                       = 'Done: {0} succeeded  {1} skipped  {2} failed'
     'summary.log'                        = 'Detailed log: {0}'
+    'summary.hint'                       = 'Next: use windots in a new terminal (install, update, link, doctor)'
 
     # --- Interactive ---
     'interactive.title'                  = '=== Windots Interactive Setup ==='

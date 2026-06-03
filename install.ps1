@@ -242,4 +242,6 @@ if ($null -eq (Get-Command 'pwsh' -ErrorAction SilentlyContinue)) {
 if ($LASTEXITCODE -ne 0) {
     exit $LASTEXITCODE
 }
+
+Write-Host ''
 _Ok 'Windots installation finished.'
