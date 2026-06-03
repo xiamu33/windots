@@ -2,6 +2,40 @@
 # Windots 交互 UI (lib/ui.ps1)
 # =====================================================================
 
+# 丢弃启动阶段或输出期间误触的按键，避免 Read-Host / ReadKey 直接消费缓冲输入
+$script:WindotsConsoleInputFlush = $false
+
+function Clear-ConsoleInputBuffer {
+    if (-not $script:WindotsConsoleInputFlush) {
+        if ($IsWindows -or $env:OS -eq 'Windows_NT') {
+            Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+internal static class WindotsConsoleInputFlush {
+    const int StdInputHandle = -10;
+    [DllImport("kernel32.dll", SetLastError = true)]
+    static extern bool FlushConsoleInputBuffer(IntPtr hConsoleInput);
+    [DllImport("kernel32.dll", SetLastError = true)]
+    static extern IntPtr GetStdHandle(int nStdHandle);
+    internal static void Flush() {
+        FlushConsoleInputBuffer(GetStdHandle(StdInputHandle));
+    }
+}
+'@ -ErrorAction SilentlyContinue
+        }
+        $script:WindotsConsoleInputFlush = $true
+    }
+    if ($IsWindows -or $env:OS -eq 'Windows_NT') {
+        try { [WindotsConsoleInputFlush]::Flush() } catch { }
+    }
+    try {
+        while ([Console]::KeyAvailable) {
+            [void][Console]::ReadKey($true)
+        }
+    }
+    catch { }
+}
+
 function Read-YesNo {
     param(
         [Parameter(Mandatory)][string] $Prompt,
@@ -9,6 +43,7 @@ function Read-YesNo {
     )
     $suffix = if ($Default) { '[Y/n]' } else { '[y/N]' }
     while ($true) {
+        Clear-ConsoleInputBuffer
         $answer = Read-Host "$Prompt $suffix"
         if ([string]::IsNullOrWhiteSpace($answer)) { return $Default }
         switch ($answer.Trim().ToLowerInvariant()) {
@@ -25,6 +60,7 @@ function Read-Text {
         [string] $Default = ''
     )
     $shown = if ($Default) { msg 'ui.text.default' $Prompt $Default } else { $Prompt }
+    Clear-ConsoleInputBuffer
     $answer = Read-Host $shown
     if ([string]::IsNullOrWhiteSpace($answer)) { return $Default }
     return $answer.Trim()
@@ -63,6 +99,8 @@ function Select-Items {
         [string[]]    $Locked = @()
     )
     if ($Items.Count -eq 0) { Write-Warn (msg 'ui.empty' $Title); return @() }
+
+    Clear-ConsoleInputBuffer
 
     $selected = New-Object 'bool[]' $Items.Count
     for ($i = 0; $i -lt $Items.Count; $i++) {
@@ -169,6 +207,9 @@ function Select-One {
         [int]         $DefaultIdx = 0
     )
     if ($Items.Count -eq 0) { return $null }
+
+    Clear-ConsoleInputBuffer
+
     $cursor = $DefaultIdx
     $hint = msg 'ui.single.hint'
     while ($true) {

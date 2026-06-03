@@ -148,6 +148,7 @@ function Resolve-LinkMode {
     Write-Info (msg 'links.symlink.devmode.guide2')
     Write-Host ''
 
+    Clear-ConsoleInputBuffer
     while ($true) {
         $key = [Console]::ReadKey($true)
         if ($key.Key -eq 'R' -or $key.KeyChar -eq 'r') {
