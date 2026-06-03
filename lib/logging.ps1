@@ -30,6 +30,38 @@ function Write-Err { param([AllowEmptyString()][string]$Message = '') Write-Log 
 function Write-Step { param([AllowEmptyString()][string]$Message = '') Write-Log -Message $Message -Level 'STEP' -Color Magenta }
 function Write-Plan { param([AllowEmptyString()][string]$Message = '') Write-Log -Message $Message -Level 'PLAN' -Color Blue }
 
+function Write-PlanBlock {
+    param(
+        [AllowEmptyString()][string[]] $Lines = @(''),
+        [int] $Indent = 2
+    )
+    $prefix = ' ' * $Indent
+    foreach ($line in $Lines) {
+        $out = if ([string]::IsNullOrEmpty($line)) { '' } else { $prefix + $line }
+        Write-Host $out -ForegroundColor Blue
+        if ($Global:WindotsLogPath) {
+            $stamp = (Get-Date).ToString('HH:mm:ss')
+            Add-Content -Path $Global:WindotsLogPath -Value "[$stamp] [PLAN] $out" -Encoding utf8
+        }
+    }
+}
+
+function Write-SummaryBlock {
+    param(
+        [AllowEmptyString()][string[]] $Lines = @(''),
+        [int] $Indent = 2
+    )
+    $prefix = ' ' * $Indent
+    foreach ($line in $Lines) {
+        $out = if ([string]::IsNullOrEmpty($line)) { '' } else { $prefix + $line }
+        Write-Host $out -ForegroundColor DarkGray
+        if ($Global:WindotsLogPath) {
+            $stamp = (Get-Date).ToString('HH:mm:ss')
+            Add-Content -Path $Global:WindotsLogPath -Value "[$stamp] [INFO] $out" -Encoding utf8
+        }
+    }
+}
+
 function Start-WindotsLog {
     param([Parameter(Mandatory)][string] $LogDir)
     if (-not (Test-Path $LogDir)) { New-Item -ItemType Directory -Path $LogDir -Force | Out-Null }

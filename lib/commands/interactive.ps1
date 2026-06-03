@@ -111,8 +111,8 @@ function Invoke-Interactive {
     $scoopAppsList = [System.Collections.Generic.List[string]]::new()
     foreach ($item in $allSelected) {
         if ($item.Contains('Packages') -and $null -ne $item.Packages) {
-            foreach ($pkg in @($item.Packages)) {
-                $pkgStr = [string]$pkg
+            foreach ($scoopName in @($item.Packages)) {
+                $pkgStr = [string]$scoopName
                 if (-not $scoopAppsList.Contains($pkgStr)) { $scoopAppsList.Add($pkgStr) }
             }
         }
@@ -170,7 +170,10 @@ function Invoke-Interactive {
     Write-Step (msg 'interactive.plan.title')
     Write-Plan (msg 'interactive.plan.proxy'    $(if ($useProxy) { $proxyUrl } else { msg 'interactive.plan.proxy.none' }))
     Write-Plan (msg 'interactive.plan.mirror'   $(if ($useScoopMirror) { msg 'interactive.plan.mirror.enabled' } else { msg 'interactive.plan.mirror.disabled' }))
-    Write-Plan (msg 'interactive.plan.packages' ($scoopApps -join ', '))
+    Write-PackageList -TitleKey 'interactive.plan.packages' `
+        -SelectedNames $selectedPkgNames `
+        -ScoopApps     $scoopApps `
+        -PackagesDef   $pkg
     Write-Plan (msg 'interactive.plan.chezmoi'  $(if ($useChezmoi) { "$chezmoiUser/$($set.Chezmoi.RepoName)" } else { msg 'interactive.plan.chezmoi.skip' }))
     Write-Plan (msg 'interactive.plan.conflict' $conflictMode)
     Write-Plan (msg 'interactive.plan.linkmode' $linkMode)

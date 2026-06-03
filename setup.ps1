@@ -119,7 +119,14 @@ else {
     Write-Step (msg 'setup.state.title')
     Write-Plan (msg 'setup.state.timestamp' $state['Timestamp'])
     Write-Plan (msg 'setup.state.proxy'     $(if ($state['Proxy_Enabled']) { $state['Proxy_Url'] } else { msg 'interactive.plan.proxy.none' }))
-    Write-Plan (msg 'setup.state.packages'  ($state['Scoop_Apps'] -join ', '))
+    $savedSelected = @()
+    if ($state.Contains('Selected_Packages') -and $null -ne $state['Selected_Packages']) {
+        $savedSelected = @($state['Selected_Packages'] | ForEach-Object { [string]$_ })
+    }
+    Write-PackageList -TitleKey 'setup.state.packages' `
+        -SelectedNames $savedSelected `
+        -ScoopApps     @($state['Scoop_Apps'] | ForEach-Object { [string]$_ }) `
+        -PackagesDef   $ctx.Packages
     Write-Plan (msg 'setup.state.chezmoi'   $(if ($state['Chezmoi_Use']) { $state['Chezmoi_User'] } else { msg 'interactive.plan.chezmoi.skip' }))
     Write-Plan (msg 'setup.state.conflict'  $state['Conflict_Mode'])
     Write-Plan (msg 'setup.state.linkmode'  $state['Link_Mode'])
