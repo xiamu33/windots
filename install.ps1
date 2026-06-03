@@ -99,6 +99,7 @@ function _Ensure-Git {
     return $true
 }
 
+$DefaultProxyUrl = 'socks5://127.0.0.1:10808'
 $WindotsHome = if ($InstallDir) { $InstallDir } else { Join-Path $HOME '.local\share\windots' }
 
 $RepoUrl = 'https://github.com/xiamu33/windots'
@@ -112,7 +113,8 @@ _Info ''
 if (-not $NoProxyPrompt -and [string]::IsNullOrWhiteSpace($ProxyUrl)) {
     $ans = Read-Host 'Configure a proxy for GitHub? [y/N]'
     if ($ans -match '^[yY]') {
-        $ProxyUrl = (Read-Host 'Proxy URL (e.g. http://127.0.0.1:10808)').Trim()
+        $entered = (Read-Host "Proxy URL (default: $DefaultProxyUrl)").Trim()
+        $ProxyUrl = if ([string]::IsNullOrWhiteSpace($entered)) { $DefaultProxyUrl } else { $entered }
     }
 }
 if (-not [string]::IsNullOrWhiteSpace($ProxyUrl)) {
@@ -228,7 +230,7 @@ _Info "Running: pwsh -NoProfile -ExecutionPolicy Bypass -File `"$setupScript`" $
 
 if ($WhatIf) {
     _Info '[WhatIf] skip running setup.ps1'
-    exit 0
+    return
 }
 
 if ($null -eq (Get-Command 'pwsh' -ErrorAction SilentlyContinue)) {
@@ -237,4 +239,7 @@ if ($null -eq (Get-Command 'pwsh' -ErrorAction SilentlyContinue)) {
 }
 
 & pwsh -NoProfile -ExecutionPolicy Bypass -File $setupScript @fwdArgs
-exit $LASTEXITCODE
+if ($LASTEXITCODE -ne 0) {
+    exit $LASTEXITCODE
+}
+_Ok 'Windots installation finished.'

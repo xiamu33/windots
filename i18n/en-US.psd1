@@ -104,7 +104,7 @@
     'interactive.step.proxy'             = '--- 1/6 Proxy Configuration ---'
     'interactive.proxy.desc'             = 'Accessing GitHub from China may be slow. Configure a proxy to speed up installation.'
     'interactive.proxy.prompt'           = 'Use a proxy?'
-    'interactive.proxy.url.prompt'       = 'Proxy URL (default: http://127.0.0.1:10808)'
+    'interactive.proxy.url.prompt'       = 'Proxy URL (default: socks5://127.0.0.1:10808)'
     'interactive.step.pkgmgr'            = '--- 2/6 Package Manager ---'
     'interactive.pkgmgr.title'           = 'Select package manager:'
     'interactive.step.mirror'            = '--- 3/6 Scoop Mirror ---'

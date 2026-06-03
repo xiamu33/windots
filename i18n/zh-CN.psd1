@@ -104,7 +104,7 @@
     'interactive.step.proxy'             = '--- 1/6 代理配置 ---'
     'interactive.proxy.desc'             = '国内访问 GitHub 可能较慢，可配置代理加速安装。'
     'interactive.proxy.prompt'           = '是否使用代理？'
-    'interactive.proxy.url.prompt'       = '代理地址 (默认 http://127.0.0.1:10808)'
+    'interactive.proxy.url.prompt'       = '代理地址 (默认 socks5://127.0.0.1:10808)'
     'interactive.step.pkgmgr'            = '--- 2/6 包管理器 ---'
     'interactive.pkgmgr.title'           = '选择包管理器：'
     'interactive.step.mirror'            = '--- 3/6 Scoop 镜像 ---'
