@@ -22,24 +22,48 @@ function Invoke-Install {
     Write-Step (msg 'install.step.scoop')
     if (Test-IsAdministrator) {
         Write-Err (msg 'install.scoop.admin.err')
-        $results.Add([pscustomobject]@{ Label = 'scoop'; Status = 'failed'; Detail = msg 'install.scoop.admin.err' })
+        $results.Add([pscustomobject]@{
+                Section = 'scoop'
+                Label   = 'scoop'
+                Status  = 'failed'
+                Detail  = (msg 'summary.detail.scoop.fail')
+            })
     }
     else {
-        $ok = Install-Scoop -UseMirror:([bool]$State.Scoop_Mirror) -WhatIf:$Ctx.WhatIf
-        $results.Add([pscustomobject]@{ Label = 'scoop'; Status = if ($ok) { 'ok' } else { 'failed' }; Detail = '' })
+        $scoopResult = Install-Scoop -UseMirror:([bool]$State.Scoop_Mirror) -WhatIf:$Ctx.WhatIf
+        $results.Add([pscustomobject]@{
+                Section = 'scoop'
+                Label   = 'scoop'
+                Status  = [string]$scoopResult.Status
+                Detail  = [string]$scoopResult.Detail
+            })
     }
 
     # 3. 切换镜像
     if ([bool]$State.Scoop_Mirror -and ((Test-CommandExists -Name 'scoop') -or $Ctx.WhatIf)) {
         Write-Step (msg 'install.step.mirror')
-        Switch-ScoopMirror -WhatIf:$Ctx.WhatIf
+        $mirrorResult = Switch-ScoopMirror -WhatIf:$Ctx.WhatIf
+        $results.Add([pscustomobject]@{
+                Section = 'mirror'
+                Label   = (msg 'summary.label.mirror')
+                Status  = [string]$mirrorResult.Status
+                Detail  = [string]$mirrorResult.Detail
+            })
     }
 
     # 4. 安装 scoop 包
     Write-Step (msg 'install.step.packages')
     foreach ($name in $State.Scoop_Apps) {
-        $ok = Install-ScoopApp -Name $name -WhatIf:$Ctx.WhatIf
-        $results.Add([pscustomobject]@{ Label = $name; Status = if ($ok) { 'ok' } else { 'failed' }; Detail = '' })
+        $appResult = Install-ScoopApp -Name $name -WhatIf:$Ctx.WhatIf
+        $pkgItem = Find-PackageItemByScoopName -PackagesDef $Ctx.Packages -ScoopName ([string]$name)
+        $desc = if ($pkgItem) { Get-PackageDesc -Package $pkgItem } else { '' }
+        $results.Add([pscustomobject]@{
+                Section = 'packages'
+                Label   = [string]$name
+                Desc    = $desc
+                Status  = [string]$appResult.Status
+                Detail  = [string]$appResult.Detail
+            })
     }
 
     # 5. 应用本地 dotfiles 配置链接
@@ -62,39 +86,66 @@ function Invoke-Install {
     foreach ($link in $planned) {
         if (-not (Test-Path $link.Src)) {
             Write-Warn (msg 'install.config.src.skip' $link.Src)
-            $results.Add([pscustomobject]@{ Label = $link.Label; Status = 'skipped'; Detail = msg 'install.config.src.skip' $link.Src })
+            $results.Add([pscustomobject]@{
+                    Section = 'config'
+                    Label   = [string]$link.Label
+                    Status  = 'skipped'
+                    Detail  = (msg 'summary.detail.config.missing')
+                })
             continue
         }
-        $status = Apply-Config `
+        $applyResult = Apply-Config `
             -Src          $link.Src `
             -Dest         $link.Dest `
             -BackupRoot   $Ctx.BackupDir `
             -ConflictMode ([string]$State.Conflict_Mode) `
             -LinkMode     $resolvedLinkMode `
             -WhatIf:$Ctx.WhatIf
-        $results.Add([pscustomobject]@{ Label = $link.Label; Status = $status; Detail = '' })
+        $results.Add([pscustomobject]@{
+                Section = 'config'
+                Label   = [string]$link.Label
+                Status  = [string]$applyResult.Status
+                Detail  = [string]$applyResult.Detail
+            })
     }
 
     # 6. chezmoi init
     if ([bool]$State.Chezmoi_Use -and -not [string]::IsNullOrWhiteSpace($State.Chezmoi_User)) {
         Write-Step (msg 'install.step.chezmoi')
         $repoName = [string]$Ctx.Settings.Chezmoi.RepoName
+        $user = [string]$State.Chezmoi_User
+        $apply = [bool]$State.Chezmoi_Apply
+        $chezmoiLabel = "$(msg 'summary.label.chezmoi') ($user/$repoName)"
+
         if (-not (Test-CommandExists -Name 'chezmoi')) {
             Write-Warn (msg 'install.chezmoi.missing')
-            $results.Add([pscustomobject]@{ Label = 'chezmoi init'; Status = 'skipped'; Detail = msg 'install.chezmoi.missing' })
+            $results.Add([pscustomobject]@{
+                    Section = 'chezmoi'
+                    Label   = $chezmoiLabel
+                    Status  = 'skipped'
+                    Detail  = (msg 'summary.detail.chezmoi.skip')
+                })
+        }
+        elseif ($Ctx.WhatIf) {
+            Write-Plan "[WhatIf] $(msg 'install.chezmoi.init' $user $repoName)$(if ($apply) {' --apply'})"
+            $results.Add([pscustomobject]@{
+                    Section = 'chezmoi'
+                    Label   = $chezmoiLabel
+                    Status  = 'ok'
+                    Detail  = (msg 'summary.detail.whatif')
+                })
         }
         else {
-            $user = [string]$State.Chezmoi_User
-            $apply = [bool]$State.Chezmoi_Apply
-            if ($Ctx.WhatIf) {
-                Write-Plan "[WhatIf] $(msg 'install.chezmoi.init' $user $repoName)$(if ($apply) {' --apply'})"
-            }
-            else {
-                Write-Info (msg 'install.chezmoi.init' $user $repoName)
-                if ($apply) { & chezmoi init --apply "$user/$repoName" }
-                else { & chezmoi init "$user/$repoName" }
-            }
-            $results.Add([pscustomobject]@{ Label = 'chezmoi init'; Status = 'ok'; Detail = '' })
+            Write-Info (msg 'install.chezmoi.init' $user $repoName)
+            if ($apply) { & chezmoi init --apply "$user/$repoName" }
+            else { & chezmoi init "$user/$repoName" }
+            $chezmoiOk = ($LASTEXITCODE -eq 0)
+            $results.Add([pscustomobject]@{
+                    Section = 'chezmoi'
+                    Label   = $chezmoiLabel
+                    Status  = if ($chezmoiOk) { 'ok' } else { 'failed' }
+                    Detail  = if ($chezmoiOk) { (msg 'summary.detail.chezmoi.ok') } else { (msg 'summary.detail.chezmoi.fail') }
+                })
         }
     }
 

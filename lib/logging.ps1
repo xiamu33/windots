@@ -49,17 +49,91 @@ function Write-PlanBlock {
 function Write-SummaryBlock {
     param(
         [AllowEmptyString()][string[]] $Lines = @(''),
-        [int] $Indent = 2
+        [int] $Indent = 2,
+        [ConsoleColor] $Color = [ConsoleColor]::DarkGray
     )
     $prefix = ' ' * $Indent
     foreach ($line in $Lines) {
         $out = if ([string]::IsNullOrEmpty($line)) { '' } else { $prefix + $line }
-        Write-Host $out -ForegroundColor DarkGray
+        Write-Host $out -ForegroundColor $Color
         if ($Global:WindotsLogPath) {
             $stamp = (Get-Date).ToString('HH:mm:ss')
             Add-Content -Path $Global:WindotsLogPath -Value "[$stamp] [INFO] $out" -Encoding utf8
         }
     }
+}
+
+function Invoke-CapturedPwshCommand {
+    param(
+        [Parameter(Mandatory)][string] $Command
+    )
+
+    $output = [System.Collections.Generic.List[string]]::new()
+    $psi = New-Object System.Diagnostics.ProcessStartInfo
+    $psi.FileName = (Get-Command pwsh -ErrorAction Stop).Source
+    [void]$psi.ArgumentList.Add('-NoProfile')
+    [void]$psi.ArgumentList.Add('-Command')
+    [void]$psi.ArgumentList.Add("$Command; exit `$LASTEXITCODE")
+    $psi.RedirectStandardOutput = $true
+    $psi.RedirectStandardError = $true
+    $psi.UseShellExecute = $false
+    $psi.CreateNoWindow = $true
+
+    $proc = New-Object System.Diagnostics.Process
+    $proc.StartInfo = $psi
+    [void]$proc.Start()
+
+    while (-not $proc.StandardOutput.EndOfStream) {
+        $line = $proc.StandardOutput.ReadLine()
+        if ($null -ne $line) {
+            Write-Host $line
+            [void]$output.Add($line)
+        }
+    }
+    while (-not $proc.StandardError.EndOfStream) {
+        $line = $proc.StandardError.ReadLine()
+        if ($null -ne $line) {
+            Write-Host $line
+            [void]$output.Add($line)
+        }
+    }
+    $proc.WaitForExit()
+
+    return @{
+        ExitCode = $proc.ExitCode
+        Output   = @($output)
+    }
+}
+
+function Get-CommandOutputLineText {
+    param($Item)
+    if ($null -eq $Item) { return '' }
+    if ($Item -is [System.Management.Automation.ErrorRecord]) {
+        $msg = [string]$Item.Exception.Message
+        if (-not [string]::IsNullOrWhiteSpace($msg)) { return $msg.Trim() }
+        return $Item.ToString().Trim()
+    }
+    return ([string]$Item).Trim()
+}
+
+function Get-CommandOutputError {
+    param([object[]] $Output)
+    if ($null -eq $Output) { return '' }
+    $lines = @($Output | ForEach-Object {
+            $text = Get-CommandOutputLineText $_
+            if ([string]::IsNullOrWhiteSpace($text)) { return $null }
+            if ($text -match '^\[[\d:]+\]\s*\[(INFO|OK|WARN|ERR|STEP|PLAN)\]\s') { return $null }
+            if ($text -match 'scoop 安装失败|scoop install failed') { return $null }
+            $text
+        } | Where-Object { $_ })
+    if ($lines.Count -eq 0) { return '' }
+
+    $noise = '^(Installing|Downloading|Extracting|Running installer|Linking|Creating shim|Adding|WARN\s|Scoop\s|Updating|Checking|.*\.\.\.\s*$)'
+    $candidates = @($lines | Where-Object { $_ -notmatch $noise })
+    if ($candidates.Count -gt 0) {
+        return [string]($candidates | Select-Object -Last 1)
+    }
+    return [string]($lines | Select-Object -Last 1)
 }
 
 function Start-WindotsLog {

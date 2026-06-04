@@ -2,28 +2,67 @@
 # Windots 运行总结 (lib/summary.ps1)
 # =====================================================================
 
-function Get-SummaryStatusLabel {
-    param([string] $Status)
-    switch ($Status) {
-        'ok' { return (msg 'summary.status.ok') }
-        'skipped' { return (msg 'summary.status.skip') }
-        'failed' { return (msg 'summary.status.fail') }
-        default { return [string]$Status }
+function Get-SummaryBlockType {
+    param([string] $Section)
+    switch ([string]$Section) {
+        { $_ -in @('scoop', 'mirror') } { return 'pkgmgr' }
+        'packages' { return 'packages' }
+        'config' { return 'config' }
+        'chezmoi' { return 'chezmoi' }
+        default { return 'packages' }
     }
 }
 
-function Get-SummaryTableColumns {
+function Write-SummaryStatusGroup {
     param(
-        [Parameter(Mandatory)][object[]] $Rows,
-        [int] $TotalWidth = 0
+        [Parameter(Mandatory)][string]   $TitleKey,
+        [Parameter(Mandatory)][string]   $Status,
+        [Parameter(Mandatory)][object[]] $Items,
+        [ConsoleColor]                   $Color = [ConsoleColor]::DarkGray,
+        [switch]                         $WithFailDetail
     )
-    $seqWidth = Get-SeqColumnWidth -RowCount @($Rows).Count
-    $statusWidth = [Math]::Max((Get-DisplayWidth (msg 'summary.col.status')), 4)
-    return @(
-        @{ Header = (msg 'summary.col.no'); Index = 0; FixedWidth = $seqWidth; FirstLineOnly = $true }
-        @{ Header = (msg 'summary.col.label'); Index = 1; AutoWidth = $true; FirstLineOnly = $true }
-        @{ Header = (msg 'summary.col.status'); Index = 2; FixedWidth = $statusWidth; FirstLineOnly = $true }
+
+    $statusItems = @($Items | Where-Object { $_.Status -eq $Status })
+    if (@($statusItems).Count -eq 0) { return }
+
+    $blocks = @(
+        @{ Type = 'pkgmgr'; LabelKey = 'summary.block.pkgmgr' }
+        @{ Type = 'packages'; LabelKey = 'summary.block.packages' }
+        @{ Type = 'config'; LabelKey = 'summary.block.config' }
+        @{ Type = 'chezmoi'; LabelKey = 'summary.block.chezmoi' }
     )
+
+    $lines = [System.Collections.Generic.List[string]]::new()
+
+    foreach ($block in $blocks) {
+        $blockItems = @($statusItems | Where-Object { (Get-SummaryBlockType -Section $_.Section) -eq $block.Type })
+        if (@($blockItems).Count -eq 0) { continue }
+
+        $label = msg $block.LabelKey
+        if ($WithFailDetail) {
+            [void]$lines.Add("$label`:")
+            foreach ($f in $blockItems) {
+                [void]$lines.Add([string]$f.Label)
+                $detail = if ($f.PSObject.Properties['Detail'] -and -not [string]::IsNullOrWhiteSpace([string]$f.Detail)) {
+                    [string]$f.Detail
+                }
+                else {
+                    (msg 'summary.detail.app.fail')
+                }
+                [void]$lines.Add("  $detail")
+            }
+        }
+        else {
+            $names = @($blockItems | ForEach-Object { [string]$_.Label })
+            [void]$lines.Add("$label`: $($names -join ', ')")
+        }
+    }
+
+    if ($lines.Count -eq 0) { return }
+
+    Write-Host ''
+    Write-Host (msg $TitleKey) -ForegroundColor $Color
+    Write-SummaryBlock -Lines @($lines) -Color $Color
 }
 
 function Show-Summary {
@@ -34,31 +73,18 @@ function Show-Summary {
     Write-Host ''
     Write-Step (msg 'summary.title')
 
-    $ok = @($Results | Where-Object { $_.Status -eq 'ok' })
-    $skipped = @($Results | Where-Object { $_.Status -eq 'skipped' })
-    $failed = @($Results | Where-Object { $_.Status -eq 'failed' })
+    $items = @($Results)
 
-    if (@($Results).Count -gt 0) {
-        $tableRows = [System.Collections.Generic.List[string[]]]::new()
-        $seq = 1
-        foreach ($r in $Results) {
-            [void]$tableRows.Add(@(
-                    [string]$seq
-                    [string]$r.Label
-                    (Get-SummaryStatusLabel -Status ([string]$r.Status))
-                ))
-            $seq++
-        }
-        $rows = @($tableRows)
-        $tableWidth = Get-PackageTableWidth
-        Write-SummaryBlock -Lines (Format-DisplayTable `
-                -Columns (Get-SummaryTableColumns -Rows $rows -TotalWidth $tableWidth) `
-                -Rows     $rows `
-                -TotalWidth $tableWidth)
-    }
+    Write-SummaryStatusGroup -TitleKey 'summary.status.group.ok' -Status 'ok' -Items $items -Color Green
+    Write-SummaryStatusGroup -TitleKey 'summary.status.group.skip' -Status 'skipped' -Items $items
+    Write-SummaryStatusGroup -TitleKey 'summary.status.group.fail' -Status 'failed' -Items $items -Color Red -WithFailDetail
+
+    $okCount = @($items | Where-Object { $_.Status -eq 'ok' }).Count
+    $skipCount = @($items | Where-Object { $_.Status -eq 'skipped' }).Count
+    $failCount = @($items | Where-Object { $_.Status -eq 'failed' }).Count
 
     Write-Host ''
-    Write-Info (msg 'summary.done' $ok.Count $skipped.Count $failed.Count)
+    Write-Info (msg 'summary.done' $okCount $skipCount $failCount)
     if ($LogFile) { Write-Info (msg 'summary.log' $LogFile) }
     Write-Info (msg 'summary.hint')
 }

@@ -29,17 +29,27 @@ function Invoke-Link {
     foreach ($link in $planned) {
         if (-not (Test-Path $link.Src)) {
             Write-Warn (msg 'link.src.skip' $link.Src)
-            $results.Add([pscustomobject]@{ Label = $link.Label; Status = 'skipped'; Detail = msg 'link.src.skip' $link.Src })
+            $results.Add([pscustomobject]@{
+                    Section = 'config'
+                    Label   = [string]$link.Label
+                    Status  = 'skipped'
+                    Detail  = (msg 'summary.detail.config.missing')
+                })
             continue
         }
-        $status = Apply-Config `
+        $applyResult = Apply-Config `
             -Src          $link.Src `
             -Dest         $link.Dest `
             -BackupRoot   $Ctx.BackupDir `
             -ConflictMode ([string]$State.Conflict_Mode) `
             -LinkMode     $resolvedLinkMode `
             -WhatIf:$Ctx.WhatIf
-        $results.Add([pscustomobject]@{ Label = $link.Label; Status = $status; Detail = '' })
+        $results.Add([pscustomobject]@{
+                Section = 'config'
+                Label   = [string]$link.Label
+                Status  = [string]$applyResult.Status
+                Detail  = [string]$applyResult.Detail
+            })
     }
 
     Show-Summary -Results $results -LogFile $Ctx.LogFile

@@ -2,6 +2,31 @@
 # Windots 配置应用 (lib/links.ps1)
 # =====================================================================
 
+function New-LinkStepResult {
+    param(
+        [Parameter(Mandatory)][string] $Status,
+        [Parameter(Mandatory)][string] $Detail
+    )
+    return [pscustomobject]@{ Status = $Status; Detail = $Detail }
+}
+
+function Get-LinkDisplayLabel {
+    param(
+        [Parameter(Mandatory)][string] $Src,
+        [string] $PackageName = '',
+        [string] $DestLeaf = ''
+    )
+    $rel = $Src.Trim().Replace('\', '/')
+    if ($rel.StartsWith('dotfiles/')) {
+        return $rel.Substring(9)
+    }
+    if (-not [string]::IsNullOrWhiteSpace($PackageName) -and $DestLeaf) {
+        return "$PackageName/$DestLeaf"
+    }
+    if ($DestLeaf) { return $DestLeaf }
+    return [IO.Path]::GetFileName($Src)
+}
+
 function Get-PlannedLinks {
     param(
         [Parameter(Mandatory)][string] $RepoRoot,
@@ -17,14 +42,17 @@ function Get-PlannedLinks {
             if ($null -eq $dot) { continue }
             $src = Resolve-RepoPath -RepoRoot $RepoRoot -Value ([string]$dot.Src)
             $dest = Resolve-DestPath -Dest ([string]$dot.Dest)
-            $links.Add([pscustomobject]@{ Src = $src; Dest = $dest; Label = $item.Name })
+            $leaf = [IO.Path]::GetFileName($dest)
+            $label = Get-LinkDisplayLabel -Src ([string]$dot.Src) -PackageName ([string]$item.Name) -DestLeaf $leaf
+            $links.Add([pscustomobject]@{ Src = $src; Dest = $dest; Label = $label })
         }
     }
 
     foreach ($extra in $Extras) {
         $src = Resolve-RepoPath -RepoRoot $RepoRoot -Value ([string]$extra.Src)
         $dest = Resolve-DestPath -Dest ([string]$extra.Dest)
-        $links.Add([pscustomobject]@{ Src = $src; Dest = $dest; Label = (Split-Path $src -Leaf) })
+        $label = Get-LinkDisplayLabel -Src ([string]$extra.Src)
+        $links.Add([pscustomobject]@{ Src = $src; Dest = $dest; Label = $label })
     }
 
     return @($links)
@@ -88,7 +116,7 @@ function Set-ConfigFileLink {
             try {
                 New-Item -ItemType HardLink -Path $Dest -Target $Src -Force | Out-Null
                 Write-Success (msg 'links.hardlink.ok' $Dest $Src)
-                return 'ok'
+                return (New-LinkStepResult -Status 'ok' -Detail (msg 'summary.detail.config.hardlink'))
             }
             catch {
                 Write-Warn (msg 'links.hardlink.fail' $_.Exception.Message)
@@ -99,7 +127,7 @@ function Set-ConfigFileLink {
             try {
                 New-Item -ItemType SymbolicLink -Path $Dest -Target $Src -Force | Out-Null
                 Write-Success (msg 'links.symlink.ok' $Dest $Src)
-                return 'ok'
+                return (New-LinkStepResult -Status 'ok' -Detail (msg 'summary.detail.config.symlink'))
             }
             catch {
                 if ($LinkMode -eq 'hardlink') {
@@ -107,7 +135,7 @@ function Set-ConfigFileLink {
                 }
                 else {
                     Write-Err (msg 'links.symlink.fail' $Dest $_.Exception.Message)
-                    return 'failed'
+                    return (New-LinkStepResult -Status 'failed' -Detail (msg 'summary.detail.config.fail'))
                 }
             }
             continue
@@ -121,15 +149,15 @@ function Set-ConfigFileLink {
                 Copy-Item -Path $Src -Destination $Dest -Force
             }
             Write-Success (msg 'links.copy.ok' $Dest $Src)
-            return 'ok'
+            return (New-LinkStepResult -Status 'ok' -Detail (msg 'summary.detail.config.copy'))
         }
         catch {
             Write-Err (msg 'links.copy.fail' $Dest $_.Exception.Message)
-            return 'failed'
+            return (New-LinkStepResult -Status 'failed' -Detail (msg 'summary.detail.config.fail'))
         }
     }
 
-    return 'failed'
+    return (New-LinkStepResult -Status 'failed' -Detail (msg 'summary.detail.config.fail'))
 }
 
 function Resolve-LinkMode {
@@ -177,7 +205,7 @@ function Apply-Config {
 
     if (-not (Test-Path $Src)) {
         Write-Warn (msg 'links.src.missing' $Src)
-        return 'skipped'
+        return (New-LinkStepResult -Status 'skipped' -Detail (msg 'summary.detail.config.missing'))
     }
 
     if (Test-Path $Dest -ErrorAction SilentlyContinue) {
@@ -192,7 +220,7 @@ function Apply-Config {
                     $srcFull = [IO.Path]::GetFullPath($Src)
                     if ($targetFull -eq $srcFull) {
                         Write-Success (msg 'links.dest.ok' $Dest)
-                        return 'ok'
+                        return (New-LinkStepResult -Status 'skipped' -Detail (msg 'summary.detail.config.link.ok'))
                     }
                 }
                 catch { }
@@ -200,7 +228,7 @@ function Apply-Config {
             elseif (-not $item.PSIsContainer) {
                 if (Test-SameNtfsFile -Path1 $Dest -Path2 $Src) {
                     Write-Success (msg 'links.dest.hardlink.ok' $Dest)
-                    return 'ok'
+                    return (New-LinkStepResult -Status 'skipped' -Detail (msg 'summary.detail.config.hardlink.ok'))
                 }
             }
         }
@@ -208,7 +236,7 @@ function Apply-Config {
         switch ($ConflictMode) {
             'keep' {
                 Write-Warn (msg 'links.dest.keep' $Dest)
-                return 'skipped'
+                return (New-LinkStepResult -Status 'skipped' -Detail (msg 'summary.detail.config.keep'))
             }
             'backup' {
                 if ($WhatIf) { Write-Plan "[WhatIf] $(msg 'backup.file.bak' $Dest)" }
@@ -236,7 +264,7 @@ function Apply-Config {
             'symlink' { Write-Plan "[WhatIf] New-Item SymbolicLink '$Dest' → '$Src'" }
             default { Write-Plan "[WhatIf] Copy-Item '$Src' → '$Dest'" }
         }
-        return 'ok'
+        return (New-LinkStepResult -Status 'ok' -Detail (msg 'summary.detail.whatif'))
     }
 
     return Set-ConfigFileLink -Src $Src -Dest $Dest -LinkMode $LinkMode
