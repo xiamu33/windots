@@ -10,7 +10,7 @@
 #   .\setup.ps1 update       # scoop update * + chezmoi
 #   .\setup.ps1 link         # 重新应用配置文件链接
 #   .\setup.ps1 doctor       # 环境健康检查
-#
+#   .\setup.ps1 cd           # 进入 windots 项目目录
 # 参数：
 #   -WhatIf       预演模式
 #   -Reconfigure  忽略已保存的 state，强制重跑 init 交互（仅 init 有效）
@@ -96,6 +96,10 @@ switch ($cmd) {
     }
     'doctor' {
         Invoke-Doctor -RepoRoot $Script:Root
+        exit 0
+    }
+    'cd' {
+        Invoke-Cd -Root $Script:Root
         exit 0
     }
     'link' {

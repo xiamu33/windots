@@ -8,17 +8,24 @@ function Register-WindotsShim {
         [switch] $WhatIf
     )
 
-    $shimSrc = Join-Path $RepoRoot 'bin\windots.cmd'
+    $ps1Src = Join-Path $RepoRoot 'bin\windots.ps1'
+    $cmdSrc = Join-Path $RepoRoot 'bin\windots.cmd'
     $localBin = Join-Path $HOME '.local\bin'
-    $shimDest = Join-Path $localBin 'windots.cmd'
+    $ps1Dest = Join-Path $localBin 'windots.ps1'
+    $cmdDest = Join-Path $localBin 'windots.cmd'
 
-    if (-not (Test-Path $shimSrc)) {
-        Write-Warn (msg 'shim.notfound' $shimSrc)
+    if (-not (Test-Path $ps1Src)) {
+        Write-Warn (msg 'shim.notfound' $ps1Src)
+        return
+    }
+    if (-not (Test-Path $cmdSrc)) {
+        Write-Warn (msg 'shim.notfound' $cmdSrc)
         return
     }
 
     if ($WhatIf) {
-        Write-Plan "[WhatIf] $(msg 'shim.copied' $shimDest)"
+        Write-Plan "[WhatIf] $(msg 'shim.copied' $ps1Dest)"
+        Write-Plan "[WhatIf] $(msg 'shim.cmd.copied' $cmdDest)"
         Write-Plan "[WhatIf] $(msg 'shim.path.added' $localBin)"
         return
     }
@@ -27,8 +34,11 @@ function Register-WindotsShim {
         New-Item -ItemType Directory -Path $localBin -Force | Out-Null
     }
 
-    Copy-Item -Path $shimSrc -Destination $shimDest -Force
-    Write-Success (msg 'shim.copied' $shimDest)
+    Copy-Item -Path $ps1Src -Destination $ps1Dest -Force
+    Write-Success (msg 'shim.copied' $ps1Dest)
+
+    Copy-Item -Path $cmdSrc -Destination $cmdDest -Force
+    Write-Success (msg 'shim.cmd.copied' $cmdDest)
 
     $currentUserPath = [System.Environment]::GetEnvironmentVariable('Path', 'User')
     if ($currentUserPath -notlike "*$localBin*") {

@@ -30,7 +30,8 @@
 
     # --- Shim ---
     'shim.notfound'                      = 'Shim source not found: {0}, skipping windots registration'
-    'shim.copied'                        = 'windots.cmd copied to {0}'
+    'shim.copied'                        = 'windots.ps1 copied to {0}'
+    'shim.cmd.copied'                    = 'windots.cmd copied to {0}'
     'shim.path.added'                    = 'Added {0} to user PATH'
     'shim.path.reopen'                   = 'Please reopen PowerShell for windots command to take effect'
     'shim.available'                     = 'windots is available in PATH'
@@ -81,7 +82,7 @@
     'doctor.git.name'                    = 'git'
     'doctor.git.installed'               = 'installed'
     'doctor.git.missing'                 = 'not found'
-    'doctor.windots.name'                = 'windots.cmd'
+    'doctor.windots.name'                = 'windots shim'
     'doctor.windots.missing'             = 'not registered, run windots init to register'
     'doctor.state.name'                  = 'state file'
     'doctor.state.missing'               = 'not found, will be created on first run'
@@ -120,7 +121,7 @@
     'summary.detail.raw.unknown'         = 'exit={0} (no detailed output)'
     'summary.done'                       = 'Done: {0} succeeded  {1} skipped  {2} failed'
     'summary.log'                        = 'Detailed log: {0}'
-    'summary.hint'                       = 'Next: use windots in a new terminal (init, install, update, link, doctor)'
+    'summary.hint'                       = 'Next: use windots in a new terminal (init, install, update, link, doctor, cd)'
 
     # --- Interactive ---
     'interactive.title'                  = '=== Windots Interactive Setup ==='
@@ -213,7 +214,10 @@
     'setup.state.missing.err'            = 'State file not found. Please run windots init first.'
     'setup.reconfigure.init.hint'        = '-Reconfigure only applies to init; use windots init -Reconfigure'
     'setup.cmd.unknown'                  = 'Unknown command: {0}'
-    'setup.cmd.hint'                     = 'Available commands: init, install, update, link, doctor'
+    'setup.cmd.hint'                     = 'Available commands: init, install, update, link, doctor, cd'
+
+    # --- cd ---
+    'cd.done'                            = 'Changed directory to {0}'
 
     # --- Package descriptions ---
     'pkg.fd.desc'                        = 'Faster find alternative'

@@ -30,7 +30,8 @@
 
     # --- Shim ---
     'shim.notfound'                      = '找不到 shim 源文件：{0}，跳过 windots 注册'
-    'shim.copied'                        = 'windots.cmd 已复制到 {0}'
+    'shim.copied'                        = 'windots.ps1 已复制到 {0}'
+    'shim.cmd.copied'                    = 'windots.cmd 已复制到 {0}'
     'shim.path.added'                    = '已将 {0} 加入用户 PATH'
     'shim.path.reopen'                   = '请重开 PowerShell 窗口后 windots 命令才生效'
     'shim.available'                     = 'windots 已在 PATH 中可用'
@@ -81,7 +82,7 @@
     'doctor.git.name'                    = 'git'
     'doctor.git.installed'               = '已安装'
     'doctor.git.missing'                 = '未找到'
-    'doctor.windots.name'                = 'windots.cmd'
+    'doctor.windots.name'                = 'windots shim'
     'doctor.windots.missing'             = '未注册，运行 windots init 重新注册'
     'doctor.state.name'                  = 'state 文件'
     'doctor.state.missing'               = '不存在，首次运行会自动创建'
@@ -120,7 +121,7 @@
     'summary.detail.raw.unknown'         = 'exit={0}（无详细错误输出）'
     'summary.done'                       = '完成: {0} 成功  {1} 跳过  {2} 失败'
     'summary.log'                        = '详细日志：{0}'
-    'summary.hint'                       = '后续请在新终端使用 windots 命令管理环境（init / install / update / link / doctor）'
+    'summary.hint'                       = '后续请在新终端使用 windots 命令管理环境（init / install / update / link / doctor / cd）'
 
     # --- 交互配置 ---
     'interactive.title'                  = '=== Windots 交互配置 ==='
@@ -213,7 +214,10 @@
     'setup.state.missing.err'            = '未找到 state 文件，请先运行 windots init 完成初始化'
     'setup.reconfigure.init.hint'        = '-Reconfigure 仅对 init 有效，请使用 windots init -Reconfigure'
     'setup.cmd.unknown'                  = '未知子命令：{0}'
-    'setup.cmd.hint'                     = '可用子命令：init, install, update, link, doctor'
+    'setup.cmd.hint'                     = '可用子命令：init, install, update, link, doctor, cd'
+
+    # --- cd ---
+    'cd.done'                            = '已进入 {0}'
 
     # --- 包描述 ---
     'pkg.fd.desc'                        = '更快的 find 替代'

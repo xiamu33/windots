@@ -31,11 +31,18 @@ function Invoke-Doctor {
         })
 
     $localBin = Join-Path $HOME '.local\bin'
-    $windotsOk = Test-Path (Join-Path $localBin 'windots.cmd')
+    $cmdShim = Join-Path $localBin 'windots.cmd'
+    $ps1Shim = Join-Path $localBin 'windots.ps1'
+    $cmdOk = Test-Path $cmdShim
+    $ps1Ok = Test-Path $ps1Shim
+    $shimParts = @()
+    if ($cmdOk) { $shimParts += 'windots.cmd' }
+    if ($ps1Ok) { $shimParts += 'windots.ps1' }
+    $windotsOk = $cmdOk
     $checks.Add([pscustomobject]@{
             Item   = msg 'doctor.windots.name'
             Status = if ($windotsOk) { 'OK' } else { 'WARN' }
-            Detail = if ($windotsOk) { $localBin } else { msg 'doctor.windots.missing' }
+            Detail = if ($windotsOk) { "$localBin ($($shimParts -join ', '))" } else { msg 'doctor.windots.missing' }
         })
 
     $settings = Import-PowerShellDataFile -Path (Join-Path $RepoRoot 'settings.psd1')

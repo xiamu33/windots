@@ -24,3 +24,4 @@ $_libDir = $PSScriptRoot
 . "$_libDir\commands\install.ps1"
 . "$_libDir\commands\update.ps1"
 . "$_libDir\commands\link.ps1"
+. "$_libDir\commands\cd.ps1"
