@@ -334,9 +334,15 @@ function Split-DisplayTextLines {
     return [string[]]$result.ToArray()
 }
 
+function Get-DisplayTableOverhead {
+    param([int] $ColumnCount)
+    # │ sp cell sp │ per column → 3 display cols each, plus leading │
+    return 1 + 3 * $ColumnCount
+}
+
 function Get-DisplayTableWidth {
     param([int[]] $ColumnWidths)
-    return 1 + ($ColumnWidths | ForEach-Object { $_ + 2 } | Measure-Object -Sum).Sum
+    return (Get-DisplayTableOverhead -ColumnCount $ColumnWidths.Count) + ($ColumnWidths | Measure-Object -Sum).Sum
 }
 
 function Get-SeqColumnWidth {
@@ -396,15 +402,22 @@ function Resolve-DisplayTableColumns {
         return @($resolved)
     }
 
-    $overhead = 1 + 2 * $resolved.Count
+    $overhead = Get-DisplayTableOverhead -ColumnCount $resolved.Count
     $fixedSum = ($resolved | Where-Object { $_.FixedWidth -gt 0 } | ForEach-Object { $_.FixedWidth } | Measure-Object -Sum).Sum
     $halfFlexItems = @($resolved | Where-Object { $_.HalfFlex })
     if ($halfFlexItems.Count -gt 0) {
         $remaining = $TotalWidth - $overhead - $fixedSum
-        $base = [Math]::Max(6, [Math]::Floor($remaining / $halfFlexItems.Count))
-        $extra = $remaining - ($base * $halfFlexItems.Count)
-        for ($hi = 0; $hi -lt $halfFlexItems.Count; $hi++) {
-            $halfFlexItems[$hi].Width = $base + $(if ($hi -eq ($halfFlexItems.Count - 1)) { $extra } else { 0 })
+        if ($remaining -lt $halfFlexItems.Count) {
+            for ($hi = 0; $hi -lt $halfFlexItems.Count; $hi++) {
+                $halfFlexItems[$hi].Width = [Math]::Max(1, [Math]::Floor($remaining / $halfFlexItems.Count))
+            }
+        }
+        else {
+            $base = [Math]::Floor($remaining / $halfFlexItems.Count)
+            $extra = $remaining - ($base * $halfFlexItems.Count)
+            for ($hi = 0; $hi -lt $halfFlexItems.Count; $hi++) {
+                $halfFlexItems[$hi].Width = $base + $(if ($hi -eq ($halfFlexItems.Count - 1)) { $extra } else { 0 })
+            }
         }
     }
     $flexWidth = [Math]::Max(8, $TotalWidth - $overhead - $fixedSum - ($halfFlexItems | ForEach-Object { $_.Width } | Measure-Object -Sum).Sum)
@@ -563,7 +576,7 @@ function Format-DisplayTable {
 function Get-PackageTableColumns {
     param(
         [Parameter(Mandatory)][object[]] $Rows,
-        [int] $TotalWidth = 80
+        [int] $TotalWidth = 0
     )
     $seqWidth = Get-SeqColumnWidth -RowCount @($Rows).Count
     return @(
@@ -574,8 +587,38 @@ function Get-PackageTableColumns {
     )
 }
 
+function Get-ConsoleTableWidth {
+    param(
+        [int] $MinWidth = 80,
+        [int] $Indent = 2
+    )
+    $consoleWidth = 0
+    try {
+        if ($IsWindows -or $env:OS -eq 'Windows_NT') {
+            try { $consoleWidth = [int][Console]::WindowWidth } catch { }
+        }
+    }
+    catch { }
+    if ($consoleWidth -le 0) {
+        try {
+            if ($Host.UI -and $Host.UI.RawUI) {
+                $consoleWidth = [int]$Host.UI.RawUI.WindowSize.Width
+            }
+        }
+        catch { }
+    }
+    if ($consoleWidth -le 0 -and $env:COLUMNS) {
+        try { $consoleWidth = [int]$env:COLUMNS } catch { }
+    }
+    if ($consoleWidth -le 0) { return $MinWidth }
+
+    $available = $consoleWidth - $Indent
+    if ($available -lt 1) { return $MinWidth }
+    return $available
+}
+
 function Get-PackageTableWidth {
-    return 80
+    return Get-ConsoleTableWidth
 }
 
 # 按 packages.psd1 分组展示已选安装包（计划摘要 / 已保存配置）

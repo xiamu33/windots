@@ -185,6 +185,7 @@
     'setup.state.title'                  = '=== Saved Configuration Found ==='
     'setup.state.timestamp'              = 'Last saved       : {0}'
     'setup.state.proxy'                  = 'Proxy            : {0}'
+    'setup.state.mirror'                 = 'scoop mirror     : {0}'
     'setup.state.packages'               = 'Packages         : {0} selected (scoop {1})'
     'setup.state.chezmoi'                = 'chezmoi          : {0}'
     'setup.state.conflict'               = 'Conflict mode    : {0}'

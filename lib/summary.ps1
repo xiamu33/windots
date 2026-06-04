@@ -15,7 +15,7 @@ function Get-SummaryStatusLabel {
 function Get-SummaryTableColumns {
     param(
         [Parameter(Mandatory)][object[]] $Rows,
-        [int] $TotalWidth = 80
+        [int] $TotalWidth = 0
     )
     $seqWidth = Get-SeqColumnWidth -RowCount @($Rows).Count
     $statusWidth = [Math]::Max((Get-DisplayWidth (msg 'summary.col.status')), 4)

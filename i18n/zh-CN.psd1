@@ -185,6 +185,7 @@
     'setup.state.title'                  = '=== 发现已保存的配置 ==='
     'setup.state.timestamp'              = '上次保存时间 : {0}'
     'setup.state.proxy'                  = '代理         : {0}'
+    'setup.state.mirror'                 = 'scoop 镜像   : {0}'
     'setup.state.packages'               = '安装包       : {0} 项 (scoop {1} 个)'
     'setup.state.chezmoi'                = 'chezmoi      : {0}'
     'setup.state.conflict'               = '配置冲突     : {0}'

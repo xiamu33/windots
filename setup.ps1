@@ -119,6 +119,7 @@ else {
     Write-Step (msg 'setup.state.title')
     Write-Plan (msg 'setup.state.timestamp' $state['Timestamp'])
     Write-Plan (msg 'setup.state.proxy'     $(if ($state['Proxy_Enabled']) { $state['Proxy_Url'] } else { msg 'interactive.plan.proxy.none' }))
+    Write-Plan (msg 'setup.state.mirror'    $(if ([bool]$state['Scoop_Mirror']) { msg 'interactive.plan.mirror.enabled' } else { msg 'interactive.plan.mirror.disabled' }))
     $savedSelected = @()
     if ($state.Contains('Selected_Packages') -and $null -ne $state['Selected_Packages']) {
         $savedSelected = @($state['Selected_Packages'] | ForEach-Object { [string]$_ })
