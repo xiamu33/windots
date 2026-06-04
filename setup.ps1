@@ -4,15 +4,16 @@
 # 编码：UTF-8 无 BOM
 #
 # 用法：
-#   .\setup.ps1              # 完整交互安装
-#   .\setup.ps1 install      # 同上
+#   .\setup.ps1              # 智能默认：无 state → init；有 state → install
+#   .\setup.ps1 init         # 全量交互初始化
+#   .\setup.ps1 install      # 增选包并安装
 #   .\setup.ps1 update       # scoop update * + chezmoi
 #   .\setup.ps1 link         # 重新应用配置文件链接
 #   .\setup.ps1 doctor       # 环境健康检查
 #
 # 参数：
 #   -WhatIf       预演模式
-#   -Reconfigure  忽略已保存的 state，强制重跑交互
+#   -Reconfigure  忽略已保存的 state，强制重跑 init 交互（仅 init 有效）
 # =====================================================================
 
 [CmdletBinding()]
@@ -80,9 +81,14 @@ if (-not $ctx.WhatIf) {
 
 
 # =====================================================================
-# 子命令派发（空参数视为 install）
+# 子命令派发（空参数智能默认：无 state / -Reconfigure → init，否则 → install）
 # =====================================================================
 $cmd = $Command.ToLowerInvariant().Trim()
+if ($cmd -eq '') {
+    if ($Reconfigure -or -not $state) { $cmd = 'init' }
+    else { $cmd = 'install' }
+}
+
 switch ($cmd) {
     'update' {
         Invoke-Update -Ctx $ctx
@@ -100,42 +106,51 @@ switch ($cmd) {
         Invoke-Link -Ctx $ctx -State $state
         exit 0
     }
-    { $_ -notin @('', 'install') } {
+    'install' {
+        if ($Reconfigure) {
+            Write-Warn (msg 'setup.reconfigure.init.hint')
+        }
+        if (-not $state) {
+            Write-Err (msg 'install.state.missing.err')
+            exit 1
+        }
+        $state = Invoke-InteractivePackages -Ctx $ctx -State $state
+        Invoke-Install -Ctx $ctx -State $state
+        exit 0
+    }
+    'init' {
+        if (-not $state -or $Reconfigure) {
+            $state = Invoke-Interactive -Ctx $ctx
+        }
+        else {
+            Clear-Host
+            Write-Step (msg 'setup.state.title')
+            Write-Plan (msg 'setup.state.timestamp' $state['Timestamp'])
+            Write-Plan (msg 'setup.state.proxy'     $(if ($state['Proxy_Enabled']) { $state['Proxy_Url'] } else { msg 'interactive.plan.proxy.none' }))
+            Write-Plan (msg 'setup.state.mirror'    $(if ([bool]$state['Scoop_Mirror']) { msg 'interactive.plan.mirror.enabled' } else { msg 'interactive.plan.mirror.disabled' }))
+            $savedSelected = @()
+            if ($state.Contains('Selected_Packages') -and $null -ne $state['Selected_Packages']) {
+                $savedSelected = @($state['Selected_Packages'] | ForEach-Object { [string]$_ })
+            }
+            Write-PackageList -TitleKey 'setup.state.packages' `
+                -SelectedNames $savedSelected `
+                -ScoopApps     @($state['Scoop_Apps'] | ForEach-Object { [string]$_ }) `
+                -PackagesDef   $ctx.Packages
+            Write-Plan (msg 'setup.state.chezmoi'   $(if ($state['Chezmoi_Use']) { $state['Chezmoi_User'] } else { msg 'interactive.plan.chezmoi.skip' }))
+            Write-Plan (msg 'setup.state.conflict'  $state['Conflict_Mode'])
+            Write-Plan (msg 'setup.state.linkmode'  $state['Link_Mode'])
+            Write-Info ''
+            $useSaved = Read-YesNo -Prompt (msg 'setup.state.use.prompt') -Default $true
+            if (-not $useSaved) {
+                $state = Invoke-Interactive -Ctx $ctx
+            }
+        }
+        Invoke-Init -Ctx $ctx -State $state
+        exit 0
+    }
+    default {
         Write-Err  (msg 'setup.cmd.unknown' $Command)
         Write-Info (msg 'setup.cmd.hint')
         exit 1
     }
 }
-
-
-# =====================================================================
-# install 主流程
-# =====================================================================
-if (-not $state -or $Reconfigure) {
-    $state = Invoke-Interactive -Ctx $ctx
-}
-else {
-    Clear-Host
-    Write-Step (msg 'setup.state.title')
-    Write-Plan (msg 'setup.state.timestamp' $state['Timestamp'])
-    Write-Plan (msg 'setup.state.proxy'     $(if ($state['Proxy_Enabled']) { $state['Proxy_Url'] } else { msg 'interactive.plan.proxy.none' }))
-    Write-Plan (msg 'setup.state.mirror'    $(if ([bool]$state['Scoop_Mirror']) { msg 'interactive.plan.mirror.enabled' } else { msg 'interactive.plan.mirror.disabled' }))
-    $savedSelected = @()
-    if ($state.Contains('Selected_Packages') -and $null -ne $state['Selected_Packages']) {
-        $savedSelected = @($state['Selected_Packages'] | ForEach-Object { [string]$_ })
-    }
-    Write-PackageList -TitleKey 'setup.state.packages' `
-        -SelectedNames $savedSelected `
-        -ScoopApps     @($state['Scoop_Apps'] | ForEach-Object { [string]$_ }) `
-        -PackagesDef   $ctx.Packages
-    Write-Plan (msg 'setup.state.chezmoi'   $(if ($state['Chezmoi_Use']) { $state['Chezmoi_User'] } else { msg 'interactive.plan.chezmoi.skip' }))
-    Write-Plan (msg 'setup.state.conflict'  $state['Conflict_Mode'])
-    Write-Plan (msg 'setup.state.linkmode'  $state['Link_Mode'])
-    Write-Info ''
-    $useSaved = Read-YesNo -Prompt (msg 'setup.state.use.prompt') -Default $true
-    if (-not $useSaved) {
-        $state = Invoke-Interactive -Ctx $ctx
-    }
-}
-
-Invoke-Install -Ctx $ctx -State $state

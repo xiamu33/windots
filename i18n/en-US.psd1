@@ -82,7 +82,7 @@
     'doctor.git.installed'               = 'installed'
     'doctor.git.missing'                 = 'not found'
     'doctor.windots.name'                = 'windots.cmd'
-    'doctor.windots.missing'             = 'not registered, run windots install to reinstall'
+    'doctor.windots.missing'             = 'not registered, run windots init to register'
     'doctor.state.name'                  = 'state file'
     'doctor.state.missing'               = 'not found, will be created on first run'
 
@@ -120,7 +120,7 @@
     'summary.detail.raw.unknown'         = 'exit={0} (no detailed output)'
     'summary.done'                       = 'Done: {0} succeeded  {1} skipped  {2} failed'
     'summary.log'                        = 'Detailed log: {0}'
-    'summary.hint'                       = 'Next: use windots in a new terminal (install, update, link, doctor)'
+    'summary.hint'                       = 'Next: use windots in a new terminal (init, install, update, link, doctor)'
 
     # --- Interactive ---
     'interactive.title'                  = '=== Windots Interactive Setup ==='
@@ -166,16 +166,27 @@
     'interactive.plan.mirror.enabled'    = 'enabled (gitee)'
     'interactive.plan.mirror.disabled'   = 'disabled'
 
-    # --- Install ---
-    'install.step.scoop'                 = '--- Installing scoop ---'
-    'install.scoop.admin.err'            = 'scoop must be installed in a regular user window, current window is admin, skipping.'
-    'install.step.mirror'                = '--- Switching scoop mirror ---'
+    # --- Init ---
+    'init.step.scoop'                    = '--- Installing scoop ---'
+    'init.scoop.admin.err'               = 'scoop must be installed in a regular user window, current window is admin, skipping.'
+    'init.step.mirror'                   = '--- Switching scoop mirror ---'
+    'init.step.packages'                 = '--- Installing scoop packages ---'
+    'init.step.config'                   = '--- Applying config files ---'
+    'init.config.src.skip'               = 'Config source missing, skipping: {0}'
+    'init.step.chezmoi'                  = '--- Initializing chezmoi ---'
+    'init.chezmoi.missing'               = 'chezmoi not found, skipping (make sure chezmoi is in the package list)'
+    'init.chezmoi.init'                  = 'chezmoi init {0}/{1}'
+
+    # --- Install (packages) ---
+    'install.interactive.title'          = '=== Windots Package Selection ==='
     'install.step.packages'              = '--- Installing scoop packages ---'
     'install.step.config'                = '--- Applying config files ---'
     'install.config.src.skip'            = 'Config source missing, skipping: {0}'
-    'install.step.chezmoi'               = '--- Initializing chezmoi ---'
-    'install.chezmoi.missing'            = 'chezmoi not found, skipping (make sure chezmoi is in the package list)'
-    'install.chezmoi.init'               = 'chezmoi init {0}/{1}'
+    'install.plan.title'                 = '=== Install Plan Summary ==='
+    'install.plan.packages'              = 'Packages  : {0} selected (scoop {1})'
+    'install.plan.added'                 = 'New       : {0}'
+    'install.plan.added.none'            = 'New       : (none)'
+    'install.state.missing.err'          = 'State file not found. Please run windots init first.'
 
     # --- Update ---
     'update.title'                       = '=== windots update ==='
@@ -198,10 +209,11 @@
     'setup.state.chezmoi'                = 'chezmoi          : {0}'
     'setup.state.conflict'               = 'Conflict mode    : {0}'
     'setup.state.linkmode'               = 'Link mode        : {0}'
-    'setup.state.use.prompt'             = 'Use saved configuration to start installation?'
-    'setup.state.missing.err'            = 'State file not found. Please run windots install first.'
+    'setup.state.use.prompt'             = 'Use saved configuration to start initialization?'
+    'setup.state.missing.err'            = 'State file not found. Please run windots init first.'
+    'setup.reconfigure.init.hint'        = '-Reconfigure only applies to init; use windots init -Reconfigure'
     'setup.cmd.unknown'                  = 'Unknown command: {0}'
-    'setup.cmd.hint'                     = 'Available commands: install, update, link, doctor'
+    'setup.cmd.hint'                     = 'Available commands: init, install, update, link, doctor'
 
     # --- Package descriptions ---
     'pkg.fd.desc'                        = 'Faster find alternative'

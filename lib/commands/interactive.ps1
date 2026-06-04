@@ -2,6 +2,151 @@
 # Windots 交互配置阶段 (lib/commands/interactive.ps1)
 # =====================================================================
 
+function Get-InteractivePackageSelection {
+    param(
+        [Parameter(Mandatory)][hashtable] $PackagesDef,
+        [string[]]                        $SavedSelected = @()
+    )
+
+    $isInstallMode = $SavedSelected.Count -gt 0
+
+    $pkgSuffix = {
+        param($x)
+        $desc = Get-PackageDesc -Package $x
+        if ($desc) { " ($desc)" } else { '' }
+    }
+
+    $getLockedNames = {
+        param($list)
+        @($list | Where-Object {
+                $chk = if ($_.Contains('Packages') -and $null -ne $_.Packages) { [string](@($_.Packages)[0]) } else { [string]$_.Name }
+                Test-ScoopInstalled -Name $chk
+            } | ForEach-Object { [string]$_.Name })
+    }
+
+    $mergeLocked = {
+        param($list)
+        $installed = & $getLockedNames $list
+        if ($isInstallMode) {
+            @($SavedSelected + $installed | Select-Object -Unique)
+        }
+        else {
+            $installed
+        }
+    }
+
+    $defaultSetFn = if ($isInstallMode) {
+        { param($x) $SavedSelected -contains [string]$x.Name }
+    }
+    else {
+        { param($x) [bool]$x.Default }
+    }
+
+    $recItems = @($PackagesDef.Recommended)
+    $recSel = Select-Items -Title (msg 'interactive.packages.rec.title') `
+        -Items         $recItems `
+        -Labeler { param($x) [string]$x.Name } `
+        -SuffixLabeler $pkgSuffix `
+        -DefaultSet    $defaultSetFn `
+        -Locked        (& $mergeLocked $recItems)
+
+    $devItems = @($PackagesDef.Optional.Dev)
+    $devSel = Select-Items -Title (msg 'interactive.packages.dev.title') `
+        -Items         $devItems `
+        -Labeler { param($x) [string]$x.Name } `
+        -SuffixLabeler $pkgSuffix `
+        -DefaultSet    $defaultSetFn `
+        -Locked        (& $mergeLocked $devItems)
+
+    $termItems = @($PackagesDef.Optional.Term)
+    $termSel = Select-Items -Title (msg 'interactive.packages.term.title') `
+        -Items         $termItems `
+        -Labeler { param($x) [string]$x.Name } `
+        -SuffixLabeler $pkgSuffix `
+        -DefaultSet    $defaultSetFn `
+        -Locked        (& $mergeLocked $termItems)
+
+    $beautyItems = @($PackagesDef.Optional.Beauty)
+    $beautySel = Select-Items -Title (msg 'interactive.packages.beauty.title') `
+        -Items         $beautyItems `
+        -Labeler { param($x) [string]$x.Name } `
+        -SuffixLabeler $pkgSuffix `
+        -DefaultSet    $defaultSetFn `
+        -Locked        (& $mergeLocked $beautyItems)
+
+    $allSelected = @()
+    foreach ($s in @($recSel) + @($devSel) + @($termSel) + @($beautySel)) { $allSelected += $s }
+
+    $selectedPkgNames = @($allSelected | ForEach-Object { [string]$_.Name } | Select-Object -Unique)
+
+    $scoopAppsList = [System.Collections.Generic.List[string]]::new()
+    foreach ($item in $allSelected) {
+        if ($item.Contains('Packages') -and $null -ne $item.Packages) {
+            foreach ($scoopName in @($item.Packages)) {
+                $pkgStr = [string]$scoopName
+                if (-not $scoopAppsList.Contains($pkgStr)) { $scoopAppsList.Add($pkgStr) }
+            }
+        }
+        else {
+            $pkgStr = [string]$item.Name
+            if (-not $scoopAppsList.Contains($pkgStr)) { $scoopAppsList.Add($pkgStr) }
+        }
+    }
+
+    return @{
+        SelectedPkgNames = $selectedPkgNames
+        ScoopApps        = @($scoopAppsList)
+    }
+}
+
+function Invoke-InteractivePackages {
+    param(
+        [Parameter(Mandatory)][pscustomobject] $Ctx,
+        [Parameter(Mandatory)]                 $State
+    )
+
+    $pkg = $Ctx.Packages
+    $savedSelected = @()
+    if ($State.Contains('Selected_Packages') -and $null -ne $State['Selected_Packages']) {
+        $savedSelected = @($State['Selected_Packages'] | ForEach-Object { [string]$_ })
+    }
+
+    Write-Step (msg 'install.interactive.title')
+    Write-Info  (msg 'interactive.repo' $Ctx.Root)
+    Write-Info  (msg 'interactive.log'  $Ctx.LogFile)
+    Write-Info  ''
+
+    Write-Step (msg 'interactive.step.packages')
+    $selection = Get-InteractivePackageSelection -PackagesDef $pkg -SavedSelected $savedSelected
+
+    $newNames = @($selection.SelectedPkgNames | Where-Object { $savedSelected -notcontains $_ })
+
+    Clear-Host
+    Write-Step (msg 'install.plan.title')
+    Write-PackageList -TitleKey 'install.plan.packages' `
+        -SelectedNames $selection.SelectedPkgNames `
+        -ScoopApps     $selection.ScoopApps `
+        -PackagesDef   $pkg
+    if ($newNames.Count -gt 0) {
+        Write-Plan (msg 'install.plan.added' ($newNames -join ', '))
+    }
+    else {
+        Write-Plan (msg 'install.plan.added.none')
+    }
+    Write-Info ''
+
+    $State['Scoop_Apps'] = @($selection.ScoopApps | ForEach-Object { [string]$_ })
+    $State['Selected_Packages'] = @($selection.SelectedPkgNames | ForEach-Object { [string]$_ })
+    $State['Timestamp'] = (Get-Date).ToString('s')
+
+    if (-not $Ctx.WhatIf) {
+        Save-WindotsState -Path $Ctx.StatePath -State $State
+        Write-Success (msg 'interactive.state.saved' $Ctx.StatePath)
+    }
+
+    return $State
+}
+
 function Invoke-Interactive {
     param([Parameter(Mandatory)][pscustomobject] $Ctx)
 
@@ -52,76 +197,9 @@ function Invoke-Interactive {
     # 4. 选择安装包
     # ------------------------------------------------------------------
     Write-Step (msg 'interactive.step.packages')
-
-    $pkgSuffix = {
-        param($x)
-        $desc = Get-PackageDesc -Package $x
-        if ($desc) { " ($desc)" } else { '' }
-    }
-
-    $getLockedNames = {
-        param($list)
-        @($list | Where-Object {
-                $chk = if ($_.Contains('Packages') -and $null -ne $_.Packages) { [string](@($_.Packages)[0]) } else { [string]$_.Name }
-                Test-ScoopInstalled -Name $chk
-            } | ForEach-Object { [string]$_.Name })
-    }
-
-    $recItems = @($pkg.Recommended)
-    $recLocked = & $getLockedNames $recItems
-    $recSel = Select-Items -Title (msg 'interactive.packages.rec.title') `
-        -Items         $recItems `
-        -Labeler { param($x) [string]$x.Name } `
-        -SuffixLabeler $pkgSuffix `
-        -DefaultSet { param($x) [bool]$x.Default } `
-        -Locked        $recLocked
-
-    $devItems = @($pkg.Optional.Dev)
-    $devLocked = & $getLockedNames $devItems
-    $devSel = Select-Items -Title (msg 'interactive.packages.dev.title') `
-        -Items         $devItems `
-        -Labeler { param($x) [string]$x.Name } `
-        -SuffixLabeler $pkgSuffix `
-        -DefaultSet { param($x) [bool]$x.Default } `
-        -Locked        $devLocked
-
-    $termItems = @($pkg.Optional.Term)
-    $termLocked = & $getLockedNames $termItems
-    $termSel = Select-Items -Title (msg 'interactive.packages.term.title') `
-        -Items         $termItems `
-        -Labeler { param($x) [string]$x.Name } `
-        -SuffixLabeler $pkgSuffix `
-        -DefaultSet { param($x) [bool]$x.Default } `
-        -Locked        $termLocked
-
-    $beautyItems = @($pkg.Optional.Beauty)
-    $beautyLocked = & $getLockedNames $beautyItems
-    $beautySel = Select-Items -Title (msg 'interactive.packages.beauty.title') `
-        -Items         $beautyItems `
-        -Labeler { param($x) [string]$x.Name } `
-        -SuffixLabeler $pkgSuffix `
-        -DefaultSet { param($x) [bool]$x.Default } `
-        -Locked        $beautyLocked
-
-    $allSelected = @()
-    foreach ($s in @($recSel) + @($devSel) + @($termSel) + @($beautySel)) { $allSelected += $s }
-
-    $selectedPkgNames = @($allSelected | ForEach-Object { [string]$_.Name } | Select-Object -Unique)
-
-    $scoopAppsList = [System.Collections.Generic.List[string]]::new()
-    foreach ($item in $allSelected) {
-        if ($item.Contains('Packages') -and $null -ne $item.Packages) {
-            foreach ($scoopName in @($item.Packages)) {
-                $pkgStr = [string]$scoopName
-                if (-not $scoopAppsList.Contains($pkgStr)) { $scoopAppsList.Add($pkgStr) }
-            }
-        }
-        else {
-            $pkgStr = [string]$item.Name
-            if (-not $scoopAppsList.Contains($pkgStr)) { $scoopAppsList.Add($pkgStr) }
-        }
-    }
-    $scoopApps = @($scoopAppsList)
+    $selection = Get-InteractivePackageSelection -PackagesDef $pkg
+    $selectedPkgNames = $selection.SelectedPkgNames
+    $scoopApps = $selection.ScoopApps
 
     # ------------------------------------------------------------------
     # 5. chezmoi

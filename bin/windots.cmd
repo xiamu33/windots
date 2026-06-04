@@ -1,6 +1,6 @@
 @echo off
 :: windots - Windows dev environment manager
-:: Usage: windots [install|update|link|doctor]
+:: Usage: windots [init|install|update|link|doctor]
 :: Requires WINDOTS_ROOT env var pointing to the repo.
 if "%WINDOTS_ROOT%"=="" (
     echo [ERR] WINDOTS_ROOT not set. Please run setup.ps1 from the repo first.

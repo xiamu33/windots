@@ -10,16 +10,7 @@ function Invoke-Link {
 
     Write-Step (msg 'link.title')
 
-    $pkgLookup = if ($State.Contains('Selected_Packages') -and $null -ne $State.Selected_Packages) {
-        $State.Selected_Packages
-    }
-    else {
-        $State.Scoop_Apps
-    }
-    $allItems = @()
-    foreach ($s in @($Ctx.Packages.Recommended) + @($Ctx.Packages.Optional.Dev) + @($Ctx.Packages.Optional.Term) + @($Ctx.Packages.Optional.Beauty)) {
-        if ($pkgLookup -contains $s.Name) { $allItems += $s }
-    }
+    $allItems = Get-SelectedPackageItems -State $State -PackagesDef $Ctx.Packages
     $extras = @($Ctx.Packages.Extras)
     $planned = Get-PlannedLinks -RepoRoot $Ctx.Root -SelectedItems $allItems -Extras $extras
 

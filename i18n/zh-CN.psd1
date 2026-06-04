@@ -82,7 +82,7 @@
     'doctor.git.installed'               = '已安装'
     'doctor.git.missing'                 = '未找到'
     'doctor.windots.name'                = 'windots.cmd'
-    'doctor.windots.missing'             = '未注册，运行 windots install 重新安装'
+    'doctor.windots.missing'             = '未注册，运行 windots init 重新注册'
     'doctor.state.name'                  = 'state 文件'
     'doctor.state.missing'               = '不存在，首次运行会自动创建'
 
@@ -120,7 +120,7 @@
     'summary.detail.raw.unknown'         = 'exit={0}（无详细错误输出）'
     'summary.done'                       = '完成: {0} 成功  {1} 跳过  {2} 失败'
     'summary.log'                        = '详细日志：{0}'
-    'summary.hint'                       = '后续请在新终端使用 windots 命令管理环境（install / update / link / doctor）'
+    'summary.hint'                       = '后续请在新终端使用 windots 命令管理环境（init / install / update / link / doctor）'
 
     # --- 交互配置 ---
     'interactive.title'                  = '=== Windots 交互配置 ==='
@@ -166,16 +166,27 @@
     'interactive.plan.mirror.enabled'    = '启用 (gitee)'
     'interactive.plan.mirror.disabled'   = '禁用'
 
-    # --- 安装流程 ---
-    'install.step.scoop'                 = '--- 安装 scoop ---'
-    'install.scoop.admin.err'            = 'scoop 必须在普通用户窗口安装，当前为管理员窗口，跳过。'
-    'install.step.mirror'                = '--- 切换 scoop 镜像 ---'
+    # --- 初始化流程 ---
+    'init.step.scoop'                    = '--- 安装 scoop ---'
+    'init.scoop.admin.err'               = 'scoop 必须在普通用户窗口安装，当前为管理员窗口，跳过。'
+    'init.step.mirror'                   = '--- 切换 scoop 镜像 ---'
+    'init.step.packages'                 = '--- 安装 scoop 包 ---'
+    'init.step.config'                   = '--- 应用配置文件 ---'
+    'init.config.src.skip'               = '配置源不存在，跳过：{0}'
+    'init.step.chezmoi'                  = '--- 初始化 chezmoi ---'
+    'init.chezmoi.missing'               = 'chezmoi 未找到，跳过（请确认已在包列表中选择 chezmoi）'
+    'init.chezmoi.init'                  = 'chezmoi init {0}/{1}'
+
+    # --- 包安装流程 ---
+    'install.interactive.title'          = '=== Windots 包选择 ==='
     'install.step.packages'              = '--- 安装 scoop 包 ---'
     'install.step.config'                = '--- 应用配置文件 ---'
     'install.config.src.skip'            = '配置源不存在，跳过：{0}'
-    'install.step.chezmoi'               = '--- 初始化 chezmoi ---'
-    'install.chezmoi.missing'            = 'chezmoi 未找到，跳过（请确认已在包列表中选择 chezmoi）'
-    'install.chezmoi.init'               = 'chezmoi init {0}/{1}'
+    'install.plan.title'                 = '=== 安装计划摘要 ==='
+    'install.plan.packages'              = '安装包    : {0} 项 (scoop {1} 个)'
+    'install.plan.added'                 = '新增包    : {0}'
+    'install.plan.added.none'            = '新增包    : (无)'
+    'install.state.missing.err'          = '未找到 state 文件，请先运行 windots init 完成初始化'
 
     # --- 更新 ---
     'update.title'                       = '=== windots update ==='
@@ -198,10 +209,11 @@
     'setup.state.chezmoi'                = 'chezmoi      : {0}'
     'setup.state.conflict'               = '配置冲突     : {0}'
     'setup.state.linkmode'               = '配置模式     : {0}'
-    'setup.state.use.prompt'             = '是否使用以上配置直接开始安装？'
-    'setup.state.missing.err'            = '未找到 state 文件，请先运行 windots install 完成初始化'
+    'setup.state.use.prompt'             = '是否使用以上配置直接开始初始化？'
+    'setup.state.missing.err'            = '未找到 state 文件，请先运行 windots init 完成初始化'
+    'setup.reconfigure.init.hint'        = '-Reconfigure 仅对 init 有效，请使用 windots init -Reconfigure'
     'setup.cmd.unknown'                  = '未知子命令：{0}'
-    'setup.cmd.hint'                     = '可用子命令：install, update, link, doctor'
+    'setup.cmd.hint'                     = '可用子命令：init, install, update, link, doctor'
 
     # --- 包描述 ---
     'pkg.fd.desc'                        = '更快的 find 替代'
