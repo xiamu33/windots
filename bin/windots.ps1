@@ -1,5 +1,5 @@
 # windots - Windows dev environment manager (PowerShell shim)
-# Usage: windots [init|install|update|link|doctor|cd]
+# Usage: windots [init|install|i|update|up|link|doctor|cd]
 # PS 7+: cd runs in the current shell; other subcommands delegate to setup.ps1.
 # PS 5.1: cd runs in the current shell; other subcommands delegate to windots.cmd.
 

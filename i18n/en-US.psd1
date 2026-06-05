@@ -218,7 +218,7 @@
     'setup.state.missing.err'            = 'State file not found. Please run windots init first.'
     'setup.reconfigure.init.hint'        = '-Reconfigure only applies to init; use windots init -Reconfigure'
     'setup.cmd.unknown'                  = 'Unknown command: {0}'
-    'setup.cmd.hint'                     = 'Available commands: init, install, update, link, doctor, cd'
+    'setup.cmd.hint'                     = 'Available commands: init, install (i), update (up), link, doctor, cd'
 
     # --- cd ---
     'cd.done'                            = 'Changed directory to {0}'

@@ -218,7 +218,7 @@
     'setup.state.missing.err'            = '未找到 state 文件，请先运行 windots init 完成初始化'
     'setup.reconfigure.init.hint'        = '-Reconfigure 仅对 init 有效，请使用 windots init -Reconfigure'
     'setup.cmd.unknown'                  = '未知子命令：{0}'
-    'setup.cmd.hint'                     = '可用子命令：init, install, update, link, doctor, cd'
+    'setup.cmd.hint'                     = '可用子命令：init, install (i), update (up), link, doctor, cd'
 
     # --- cd ---
     'cd.done'                            = '已进入 {0}'

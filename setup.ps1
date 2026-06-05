@@ -6,8 +6,8 @@
 # 用法：
 #   .\setup.ps1              # 智能默认：无 state → init；有 state → install
 #   .\setup.ps1 init         # 全量交互初始化
-#   .\setup.ps1 install      # 增选包并安装
-#   .\setup.ps1 update       # scoop update * + chezmoi
+#   .\setup.ps1 install      # 增选包并安装（别名 i）
+#   .\setup.ps1 update       # scoop update * + chezmoi（别名 up）
 #   .\setup.ps1 link         # 重新应用配置文件链接
 #   .\setup.ps1 doctor       # 环境健康检查
 #   .\setup.ps1 cd           # 进入 windots 项目目录
@@ -84,6 +84,15 @@ if (-not $ctx.WhatIf) {
 # 子命令派发（空参数智能默认：无 state / -Reconfigure → init，否则 → install）
 # =====================================================================
 $cmd = $Command.ToLowerInvariant().Trim()
+
+$cmdAliases = @{
+    'i'  = 'install'
+    'up' = 'update'
+}
+if ($cmdAliases.ContainsKey($cmd)) {
+    $cmd = $cmdAliases[$cmd]
+}
+
 if ($cmd -eq '') {
     if ($Reconfigure -or -not $state) { $cmd = 'init' }
     else { $cmd = 'install' }
