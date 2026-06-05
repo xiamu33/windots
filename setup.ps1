@@ -8,19 +8,23 @@
 #   .\setup.ps1 init         # 全量交互初始化
 #   .\setup.ps1 install      # 增选包并安装（别名 i）
 #   .\setup.ps1 update       # scoop update * + chezmoi（别名 up）
+#   .\setup.ps1 uninstall    # 取消选包并从 scoop 卸载（别名 rm）
+#   .\setup.ps1 clean        # 清理 logs、backup；-All 同时删除 state
 #   .\setup.ps1 link         # 重新应用配置文件链接
 #   .\setup.ps1 doctor       # 环境健康检查
 #   .\setup.ps1 cd           # 进入 windots 项目目录
 # 参数：
 #   -WhatIf       预演模式
 #   -Reconfigure  忽略已保存的 state，强制重跑 init 交互（仅 init 有效）
+#   -All          清理时同时删除 state（仅 clean 有效）
 # =====================================================================
 
 [CmdletBinding()]
 param(
     [string] $Command = '',
     [switch] $WhatIf,
-    [switch] $Reconfigure
+    [switch] $Reconfigure,
+    [switch] $All
 )
 
 Set-StrictMode -Version Latest
@@ -88,6 +92,7 @@ $cmd = $Command.ToLowerInvariant().Trim()
 $cmdAliases = @{
     'i'  = 'install'
     'up' = 'update'
+    'rm' = 'uninstall'
 }
 if ($cmdAliases.ContainsKey($cmd)) {
     $cmd = $cmdAliases[$cmd]
@@ -129,6 +134,18 @@ switch ($cmd) {
         }
         $state = Invoke-InteractivePackages -Ctx $ctx -State $state
         Invoke-Install -Ctx $ctx -State $state
+        exit 0
+    }
+    'uninstall' {
+        if (-not $state) {
+            Write-Err (msg 'uninstall.state.missing.err')
+            exit 1
+        }
+        Invoke-Uninstall -Ctx $ctx -State $state
+        exit 0
+    }
+    'clean' {
+        Invoke-Clean -Ctx $ctx -All:$All
         exit 0
     }
     'init' {

@@ -96,8 +96,11 @@ function Select-Items {
         [scriptblock] $SuffixLabeler = $null,
         [scriptblock] $DefaultSet = { param($x) $false },
         [string[]]    $Disabled = @(),
+        [string[]]    $NotInstalled = @(),
+        [string[]]    $Installed = @(),
         [string[]]    $Locked = @()
     )
+    $Items = @($Items | Where-Object { $null -ne $_ })
     if ($Items.Count -eq 0) { Write-Warn (msg 'ui.empty' $Title); return @() }
 
     Clear-ConsoleInputBuffer
@@ -105,11 +108,14 @@ function Select-Items {
     $selected = New-Object 'bool[]' $Items.Count
     for ($i = 0; $i -lt $Items.Count; $i++) {
         $lbl = & $Labeler $Items[$i]
-        $selected[$i] = if ($Locked -contains $lbl) { $true } else { [bool](& $DefaultSet $Items[$i]) }
+        $selected[$i] = if ($Locked -contains $lbl) { $true }
+        elseif ($Disabled -contains $lbl -or $NotInstalled -contains $lbl) { $false }
+        else { [bool](& $DefaultSet $Items[$i]) }
     }
     $cursor = 0
 
     $installedTag = msg 'ui.select.installed'
+    $notInstalledTag = msg 'ui.select.not.installed'
     $unsupportedTag = msg 'ui.select.unsupported'
     $hint = msg 'ui.select.hint'
 
@@ -120,21 +126,30 @@ function Select-Items {
         Write-Host ''
 
         $installedTagBaseWidth = 0
+        $notInstalledTagWidth = Get-DisplayWidth $notInstalledTag
         for ($i = 0; $i -lt $Items.Count; $i++) {
             $label = & $Labeler $Items[$i]
             $sfx = if ($SuffixLabeler) { [string](& $SuffixLabeler $Items[$i]) } else { '' }
             if ($Disabled -contains $label) { continue }
+            if ($NotInstalled -contains $label) {
+                $w = Get-DisplayWidth ("  [ ] $label$sfx")
+                if ($w -gt $installedTagBaseWidth) { $installedTagBaseWidth = $w }
+                continue
+            }
             $arrow = if ($i -eq $cursor) { '>' } else { ' ' }
             $mark = if ($selected[$i]) { 'x' } else { ' ' }
             $w = Get-DisplayWidth ("$arrow [$mark] $label$sfx")
             if ($w -gt $installedTagBaseWidth) { $installedTagBaseWidth = $w }
         }
         if ($installedTagBaseWidth -gt 0) { $installedTagBaseWidth += 2 }
+        $tagBaseWidth = [Math]::Max($installedTagBaseWidth, $notInstalledTagWidth + 2)
 
         for ($i = 0; $i -lt $Items.Count; $i++) {
             $label = & $Labeler $Items[$i]
             $sfx = if ($SuffixLabeler) { [string](& $SuffixLabeler $Items[$i]) } else { '' }
             $isDisabled = $Disabled -contains $label
+            $isNotInstalled = $NotInstalled -contains $label
+            $isInstalled = $Installed -contains $label
             $isLocked = $Locked -contains $label
             $mark = if ($selected[$i]) { 'x' } else { ' ' }
             $arrow = if ($i -eq $cursor) { '>' } else { ' ' }
@@ -142,14 +157,41 @@ function Select-Items {
             if ($isDisabled) {
                 Write-Host ("  [ ] $label  $unsupportedTag") -ForegroundColor DarkGray
             }
+            elseif ($isNotInstalled) {
+                $lineText = "  [ ] $label$sfx"
+                $lineWidth = Get-DisplayWidth $lineText
+                if ($tagBaseWidth -gt 0) {
+                    Write-Host -NoNewline ($lineText + (' ' * [Math]::Max(0, ($tagBaseWidth - $lineWidth)))) -ForegroundColor DarkGray
+                }
+                else {
+                    Write-Host -NoNewline $lineText -ForegroundColor DarkGray
+                    Write-Host -NoNewline '  '
+                }
+                Write-Host $notInstalledTag -ForegroundColor DarkGray
+            }
             elseif ($isLocked) {
                 $lockedText = "$arrow [x] $label$sfx"
                 $lockedWidth = Get-DisplayWidth $lockedText
-                if ($installedTagBaseWidth -gt 0) {
-                    Write-Host -NoNewline ($lockedText + (' ' * [Math]::Max(0, ($installedTagBaseWidth - $lockedWidth)))) -ForegroundColor DarkGray
+                if ($tagBaseWidth -gt 0) {
+                    Write-Host -NoNewline ($lockedText + (' ' * [Math]::Max(0, ($tagBaseWidth - $lockedWidth)))) -ForegroundColor DarkGray
                 }
                 else {
                     Write-Host -NoNewline $lockedText -ForegroundColor DarkGray
+                    Write-Host -NoNewline '  '
+                }
+                Write-Host $installedTag -ForegroundColor DarkGreen
+            }
+            elseif ($isInstalled) {
+                $color = if ($i -eq $cursor) { [ConsoleColor]::Cyan }
+                elseif ($selected[$i]) { [ConsoleColor]::Green }
+                else { [ConsoleColor]::Gray }
+                $lineText = "$arrow [$mark] $label$sfx"
+                $lineWidth = Get-DisplayWidth $lineText
+                if ($tagBaseWidth -gt 0) {
+                    Write-Host -NoNewline ($lineText + (' ' * [Math]::Max(0, ($tagBaseWidth - $lineWidth)))) -ForegroundColor $color
+                }
+                else {
+                    Write-Host -NoNewline $lineText -ForegroundColor $color
                     Write-Host -NoNewline '  '
                 }
                 Write-Host $installedTag -ForegroundColor DarkGreen
@@ -170,14 +212,14 @@ function Select-Items {
             { $_ -in @('DownArrow', 'J') } { $cursor = ($cursor + 1) % $Items.Count }
             'Spacebar' {
                 $lbl = & $Labeler $Items[$cursor]
-                if ($Disabled -notcontains $lbl -and $Locked -notcontains $lbl) {
+                if ($Disabled -notcontains $lbl -and $NotInstalled -notcontains $lbl -and $Locked -notcontains $lbl) {
                     $selected[$cursor] = -not $selected[$cursor]
                 }
             }
             'A' {
                 for ($i = 0; $i -lt $Items.Count; $i++) {
                     $lbl = & $Labeler $Items[$i]
-                    if ($Disabled -notcontains $lbl -and $Locked -notcontains $lbl) { $selected[$i] = $true }
+                    if ($Disabled -notcontains $lbl -and $NotInstalled -notcontains $lbl -and $Locked -notcontains $lbl) { $selected[$i] = $true }
                 }
             }
             'N' {

@@ -5,10 +5,12 @@
 function Get-InteractivePackageSelection {
     param(
         [Parameter(Mandatory)][hashtable] $PackagesDef,
-        [string[]]                        $SavedSelected = @()
+        [string[]]                        $SavedSelected = @(),
+        [ValidateSet('install', 'uninstall')]
+        [string]                          $Mode = 'install'
     )
 
-    $isInstallMode = $SavedSelected.Count -gt 0
+    $isInstallMode = $Mode -eq 'install'
 
     $pkgSuffix = {
         param($x)
@@ -16,18 +18,21 @@ function Get-InteractivePackageSelection {
         if ($desc) { " ($desc)" } else { '' }
     }
 
+    $testPkgInstalled = {
+        param($x)
+        $chk = if ($x.Contains('Packages') -and $null -ne $x.Packages) { [string](@($x.Packages)[0]) } else { [string]$x.Name }
+        Test-ScoopInstalled -Name $chk
+    }
+
     $getLockedNames = {
         param($list)
-        @($list | Where-Object {
-                $chk = if ($_.Contains('Packages') -and $null -ne $_.Packages) { [string](@($_.Packages)[0]) } else { [string]$_.Name }
-                Test-ScoopInstalled -Name $chk
-            } | ForEach-Object { [string]$_.Name })
+        @($list | Where-Object { & $testPkgInstalled $_ } | ForEach-Object { [string]$_.Name })
     }
 
     $mergeLocked = {
         param($list)
         $installed = & $getLockedNames $list
-        if ($isInstallMode) {
+        if ($isInstallMode -and $SavedSelected.Count -gt 0) {
             @($SavedSelected + $installed | Select-Object -Unique)
         }
         else {
@@ -35,61 +40,65 @@ function Get-InteractivePackageSelection {
         }
     }
 
-    $defaultSetFn = if ($isInstallMode) {
+    $defaultSetFn = if ($isInstallMode -and $SavedSelected.Count -gt 0) {
         { param($x) $SavedSelected -contains [string]$x.Name }
     }
-    else {
+    elseif ($isInstallMode) {
         { param($x) [bool]$x.Default }
     }
+    else {
+        { param($x) $false }
+    }
 
-    $recItems = @($PackagesDef.Recommended)
-    $recSel = Select-Items -Title (msg 'interactive.packages.rec.title') `
-        -Items         $recItems `
-        -Labeler { param($x) [string]$x.Name } `
-        -SuffixLabeler $pkgSuffix `
-        -DefaultSet    $defaultSetFn `
-        -Locked        (& $mergeLocked $recItems)
+    $getNotInstalledNames = {
+        param($list)
+        @($list | Where-Object { -not (& $testPkgInstalled $_) } | ForEach-Object { [string]$_.Name })
+    }
 
-    $devItems = @($PackagesDef.Optional.Dev)
-    $devSel = Select-Items -Title (msg 'interactive.packages.dev.title') `
-        -Items         $devItems `
-        -Labeler { param($x) [string]$x.Name } `
-        -SuffixLabeler $pkgSuffix `
-        -DefaultSet    $defaultSetFn `
-        -Locked        (& $mergeLocked $devItems)
+    $selectGroup = {
+        param(
+            [string] $TitleKey,
+            $Items
+        )
+        $Items = @($Items | Where-Object { $null -ne $_ })
+        if ($Items.Count -eq 1 -and ($Items[0] -is [System.Array])) {
+            $nested = @($Items[0] | Where-Object { $null -ne $_ })
+            if ($nested.Count -gt 0) { $Items = $nested }
+        }
+        if ($Items.Count -eq 0) { return @() }
+        $selectParams = @{
+            Title         = (msg $TitleKey)
+            Items         = $Items
+            Labeler       = { param($x) [string]$x.Name }
+            SuffixLabeler = $pkgSuffix
+            DefaultSet    = $defaultSetFn
+        }
+        if ($isInstallMode) {
+            $selectParams['Locked'] = & $mergeLocked $Items
+        }
+        else {
+            $selectParams['NotInstalled'] = & $getNotInstalledNames $Items
+            $selectParams['Installed'] = & $getLockedNames $Items
+        }
+        Select-Items @selectParams
+    }
 
-    $termItems = @($PackagesDef.Optional.Term)
-    $termSel = Select-Items -Title (msg 'interactive.packages.term.title') `
-        -Items         $termItems `
-        -Labeler { param($x) [string]$x.Name } `
-        -SuffixLabeler $pkgSuffix `
-        -DefaultSet    $defaultSetFn `
-        -Locked        (& $mergeLocked $termItems)
-
-    $beautyItems = @($PackagesDef.Optional.Beauty)
-    $beautySel = Select-Items -Title (msg 'interactive.packages.beauty.title') `
-        -Items         $beautyItems `
-        -Labeler { param($x) [string]$x.Name } `
-        -SuffixLabeler $pkgSuffix `
-        -DefaultSet    $defaultSetFn `
-        -Locked        (& $mergeLocked $beautyItems)
+    $recSel = & $selectGroup 'interactive.packages.rec.title' @($PackagesDef.Recommended)
+    $devSel = & $selectGroup 'interactive.packages.dev.title' @($PackagesDef.Optional.Dev)
+    $termSel = & $selectGroup 'interactive.packages.term.title' @($PackagesDef.Optional.Term)
+    $beautySel = & $selectGroup 'interactive.packages.beauty.title' @($PackagesDef.Optional.Beauty)
 
     $allSelected = @()
-    foreach ($s in @($recSel) + @($devSel) + @($termSel) + @($beautySel)) { $allSelected += $s }
+    foreach ($group in @($recSel, $devSel, $termSel, $beautySel)) {
+        foreach ($s in @($group)) { $allSelected += $s }
+    }
 
-    $selectedPkgNames = @($allSelected | ForEach-Object { [string]$_.Name } | Select-Object -Unique)
+    $selectedPkgNames = [string[]]@($allSelected | ForEach-Object { [string]$_.Name } | Select-Object -Unique)
 
     $scoopAppsList = [System.Collections.Generic.List[string]]::new()
     foreach ($item in $allSelected) {
-        if ($item.Contains('Packages') -and $null -ne $item.Packages) {
-            foreach ($scoopName in @($item.Packages)) {
-                $pkgStr = [string]$scoopName
-                if (-not $scoopAppsList.Contains($pkgStr)) { $scoopAppsList.Add($pkgStr) }
-            }
-        }
-        else {
-            $pkgStr = [string]$item.Name
-            if (-not $scoopAppsList.Contains($pkgStr)) { $scoopAppsList.Add($pkgStr) }
+        foreach ($app in (Get-PackageItemScoopApps -PackageItem $item)) {
+            if (-not $scoopAppsList.Contains($app)) { $scoopAppsList.Add($app) }
         }
     }
 
@@ -145,6 +154,88 @@ function Invoke-InteractivePackages {
     }
 
     return $State
+}
+
+function Invoke-InteractivePackagesUninstall {
+    param(
+        [Parameter(Mandatory)][pscustomobject] $Ctx,
+        [Parameter(Mandatory)]                 $State
+    )
+
+    $pkg = $Ctx.Packages
+    $savedSelected = @()
+    if ($State.Contains('Selected_Packages') -and $null -ne $State['Selected_Packages']) {
+        $savedSelected = @($State['Selected_Packages'] | ForEach-Object { [string]$_ })
+    }
+
+    if ($savedSelected.Count -eq 0) {
+        Write-Warn (msg 'uninstall.none.selected')
+        return [pscustomobject]@{
+            State                = $State
+            RemovedPackages      = @()
+            ScoopAppsToUninstall = @()
+        }
+    }
+
+    Write-Step (msg 'uninstall.interactive.title')
+    Write-Info  (msg 'interactive.repo' $Ctx.Root)
+    Write-Info  (msg 'interactive.log'  $Ctx.LogFile)
+    Write-Info  ''
+
+    Write-Step (msg 'uninstall.interactive.step.packages')
+    $selection = Get-InteractivePackageSelection -PackagesDef $pkg -SavedSelected $savedSelected -Mode 'uninstall'
+
+    $removedNames = [string[]]@($selection.SelectedPkgNames | ForEach-Object { [string]$_ })
+    if (@($removedNames).Count -eq 0) {
+        Write-Info (msg 'uninstall.nothing.todo')
+        return [pscustomobject]@{
+            State                = $State
+            RemovedPackages      = @()
+            ScoopAppsToUninstall = @()
+        }
+    }
+
+    $remainingNames = [string[]]@($savedSelected | Where-Object { $removedNames -notcontains $_ })
+    $remainingScoopApps = Get-ScoopAppsForPackageNames -PackagesDef $pkg -PackageNames $remainingNames
+    $appsToRemove = [string[]]@(Get-ScoopAppsToUninstall `
+        -PackagesDef           $pkg `
+        -RemovedPackageNames    $removedNames `
+        -RemainingPackageNames  $remainingNames)
+
+    Clear-Host
+    Write-Step (msg 'uninstall.plan.title')
+    Write-PackageList -TitleKey 'uninstall.plan.remaining' `
+        -SelectedNames $remainingNames `
+        -ScoopApps     $remainingScoopApps `
+        -PackagesDef   $pkg
+    if (@($removedNames).Count -gt 0) {
+        Write-Plan (msg 'uninstall.plan.removed' ($removedNames -join ', '))
+    }
+    else {
+        Write-Plan (msg 'uninstall.plan.removed.none')
+    }
+    if (@($appsToRemove).Count -gt 0) {
+        Write-Plan (msg 'uninstall.plan.apps' ($appsToRemove -join ', '))
+    }
+    else {
+        Write-Plan (msg 'uninstall.plan.apps.none')
+    }
+    Write-Info ''
+
+    $State['Scoop_Apps'] = @($remainingScoopApps | ForEach-Object { [string]$_ })
+    $State['Selected_Packages'] = @($remainingNames | ForEach-Object { [string]$_ })
+    $State['Timestamp'] = (Get-Date).ToString('s')
+
+    if (-not $Ctx.WhatIf) {
+        Save-WindotsState -Path $Ctx.StatePath -State $State
+        Write-Success (msg 'interactive.state.saved' $Ctx.StatePath)
+    }
+
+    return [pscustomobject]@{
+        State                = $State
+        RemovedPackages      = @($removedNames | ForEach-Object { [string]$_ })
+        ScoopAppsToUninstall = @($appsToRemove | ForEach-Object { [string]$_ })
+    }
 }
 
 function Invoke-Interactive {

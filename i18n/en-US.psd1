@@ -15,6 +15,7 @@
     'ui.empty'                           = '{0}: no items available, skipping'
     'ui.select.hint'                     = '  Up/Down Move  Space Toggle  A Select All  N Deselect All  Enter Confirm  Esc Cancel'
     'ui.select.installed'                = '[installed]'
+    'ui.select.not.installed'            = '[not installed]'
     'ui.select.unsupported'              = '[unsupported]'
     'ui.single.hint'                     = '  Up/Down Move  Enter Confirm'
     'ui.yesno.invalid'                   = 'Please enter y or n'
@@ -51,6 +52,10 @@
     'scoop.app.installing'               = 'Installing via scoop: {0}'
     'scoop.app.fail'                     = 'scoop install failed: {0} (exit={1})'
     'scoop.app.ok'                       = 'scoop: {0} installed'
+    'scoop.app.not.installed'            = 'scoop: {0} not installed, skipping'
+    'scoop.app.uninstalling'             = 'Uninstalling via scoop: {0}'
+    'scoop.app.uninstall.fail'           = 'scoop uninstall failed: {0} (exit={1})'
+    'scoop.app.uninstalled'              = 'scoop: {0} uninstalled'
 
     # --- Backup ---
     'backup.dir.zip'                     = 'Directory backed up as zip: {0}'
@@ -93,9 +98,13 @@
 
     # --- Summary ---
     'summary.title'                      = '=== Run Summary ==='
+    'summary.title.uninstall'            = '=== Uninstall Summary ==='
     'summary.status.group.ok'            = '--- Installed ---'
+    'summary.status.group.ok.uninstall'  = '--- Uninstalled ---'
     'summary.status.group.skip'          = '--- Already installed, skipping ---'
+    'summary.status.group.skip.uninstall' = '--- Not installed, skipping ---'
     'summary.status.group.fail'          = '--- Install failed ---'
+    'summary.status.group.fail.uninstall' = '--- Uninstall failed ---'
     'summary.block.pkgmgr'               = 'Package manager'
     'summary.block.packages'             = 'scoop packages'
     'summary.block.config'               = 'Config files'
@@ -111,6 +120,9 @@
     'summary.detail.app.skip'            = 'already installed, skipping'
     'summary.detail.app.ok'              = 'installed'
     'summary.detail.app.fail'            = 'install failed'
+    'summary.detail.app.uninstall.fail'  = 'uninstall failed'
+    'summary.detail.app.not.installed'   = 'not installed, skipping'
+    'summary.detail.app.uninstalled'     = 'uninstalled'
     'summary.detail.config.missing'      = 'source missing, skipping'
     'summary.detail.config.link.ok'      = 'link already correct'
     'summary.detail.config.hardlink.ok'  = 'hard link already correct'
@@ -124,8 +136,9 @@
     'summary.detail.chezmoi.fail'        = 'init failed'
     'summary.detail.raw.unknown'         = 'exit={0} (no detailed output)'
     'summary.done'                       = 'Done: {0} succeeded  {1} skipped  {2} failed'
+    'summary.done.uninstall'             = 'Done: {0} uninstalled  {1} skipped  {2} failed'
     'summary.log'                        = 'Detailed log: {0}'
-    'summary.hint'                       = 'Next: use windots in a new terminal (init, install, update, link, doctor, cd)'
+    'summary.hint'                       = 'Next: use windots in a new terminal (init, install, uninstall, update, clean, link, doctor, cd)'
 
     # --- Interactive ---
     'interactive.title'                  = '=== Windots Interactive Setup ==='
@@ -193,6 +206,30 @@
     'install.plan.added.none'            = 'New       : (none)'
     'install.state.missing.err'          = 'State file not found. Please run windots init first.'
 
+    # --- Uninstall ---
+    'uninstall.interactive.title'        = '=== Windots Package Uninstall ==='
+    'uninstall.interactive.step.packages' = '--- Select packages to uninstall (checked = remove) ---'
+    'uninstall.plan.title'               = '=== Uninstall Plan ==='
+    'uninstall.plan.remaining'           = 'Keep       : {0} packages (scoop {1} apps)'
+    'uninstall.plan.removed'             = 'Remove     : {0}'
+    'uninstall.plan.removed.none'        = 'Remove     : (none)'
+    'uninstall.plan.apps'                = 'Uninstall scoop: {0}'
+    'uninstall.plan.apps.none'           = 'Uninstall scoop: (none)'
+    'uninstall.step.packages'            = '--- Uninstall scoop apps ---'
+    'uninstall.none.selected'            = 'No packages selected in state, nothing to uninstall'
+    'uninstall.nothing.todo'             = 'No packages removed, skipping uninstall'
+    'uninstall.state.missing.err'        = 'State file not found. Please run windots init first.'
+
+    # --- Clean ---
+    'clean.title'                        = '=== windots clean ==='
+    'clean.logs.done'                    = 'Cleaned logs directory ({0} items)'
+    'clean.logs.empty'                   = 'Logs directory is empty, skipping'
+    'clean.backup.done'                  = 'Cleaned backup directory ({0} items)'
+    'clean.backup.empty'                 = 'Backup directory is empty, skipping'
+    'clean.state.done'                   = 'Removed state: {0}'
+    'clean.state.missing'                = 'State file not found, skipping'
+    'clean.state.hint'                   = 'Tip: use windots clean -All to also remove state'
+
     # --- Update ---
     'update.title'                       = '=== windots update ==='
     'update.windots.step'                = '--- Updating windots ---'
@@ -231,7 +268,7 @@
     'setup.state.missing.err'            = 'State file not found. Please run windots init first.'
     'setup.reconfigure.init.hint'        = '-Reconfigure only applies to init; use windots init -Reconfigure'
     'setup.cmd.unknown'                  = 'Unknown command: {0}'
-    'setup.cmd.hint'                     = 'Available commands: init, install (i), update (up), link, doctor, cd'
+    'setup.cmd.hint'                     = 'Available commands: init, install (i), uninstall (rm), update (up), clean, link, doctor, cd'
 
     # --- cd ---
     'cd.done'                            = 'Changed directory to {0}'

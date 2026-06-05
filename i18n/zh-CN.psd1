@@ -15,6 +15,7 @@
     'ui.empty'                           = '{0} : 无可选项，跳过'
     'ui.select.hint'                     = '  ↑/↓ 移动  空格 切换  A 全选  N 全不选  Enter 确认  Esc 取消'
     'ui.select.installed'                = '[已安装]'
+    'ui.select.not.installed'            = '[未安装]'
     'ui.select.unsupported'              = '[暂不支持]'
     'ui.single.hint'                     = '  ↑/↓ 移动  Enter 确认'
     'ui.yesno.invalid'                   = '请输入 y 或 n'
@@ -51,6 +52,10 @@
     'scoop.app.installing'               = '正在通过 scoop 安装：{0}'
     'scoop.app.fail'                     = 'scoop 安装失败：{0} (exit={1})'
     'scoop.app.ok'                       = 'scoop: {0} 安装完成'
+    'scoop.app.not.installed'            = 'scoop: {0} 未安装，跳过'
+    'scoop.app.uninstalling'             = '正在通过 scoop 卸载：{0}'
+    'scoop.app.uninstall.fail'           = 'scoop 卸载失败：{0} (exit={1})'
+    'scoop.app.uninstalled'              = 'scoop: {0} 已卸载'
 
     # --- 备份 ---
     'backup.dir.zip'                     = '目录已备份为 zip：{0}'
@@ -93,9 +98,13 @@
 
     # --- 运行总结 ---
     'summary.title'                      = '=== 运行总结 ==='
+    'summary.title.uninstall'            = '=== 卸载总结 ==='
     'summary.status.group.ok'            = '--- 安装成功 ---'
+    'summary.status.group.ok.uninstall'  = '--- 卸载成功 ---'
     'summary.status.group.skip'          = '--- 已安装，跳过 ---'
+    'summary.status.group.skip.uninstall' = '--- 未安装，跳过 ---'
     'summary.status.group.fail'          = '--- 安装失败 ---'
+    'summary.status.group.fail.uninstall' = '--- 卸载失败 ---'
     'summary.block.pkgmgr'               = '包管理器'
     'summary.block.packages'             = 'scoop 包'
     'summary.block.config'               = '配置文件'
@@ -111,6 +120,9 @@
     'summary.detail.app.skip'            = '已安装，跳过'
     'summary.detail.app.ok'              = '安装完成'
     'summary.detail.app.fail'            = '安装失败'
+    'summary.detail.app.uninstall.fail'  = '卸载失败'
+    'summary.detail.app.not.installed'   = '未安装，跳过'
+    'summary.detail.app.uninstalled'     = '已卸载'
     'summary.detail.config.missing'      = '源不存在，跳过'
     'summary.detail.config.link.ok'      = '链接已正确'
     'summary.detail.config.hardlink.ok'  = '硬链接已正确'
@@ -124,8 +136,9 @@
     'summary.detail.chezmoi.fail'        = '初始化失败'
     'summary.detail.raw.unknown'         = 'exit={0}（无详细错误输出）'
     'summary.done'                       = '完成: {0} 成功  {1} 跳过  {2} 失败'
+    'summary.done.uninstall'             = '完成: {0} 卸载  {1} 跳过  {2} 失败'
     'summary.log'                        = '详细日志：{0}'
-    'summary.hint'                       = '后续请在新终端使用 windots 命令管理环境（init / install / update / link / doctor / cd）'
+    'summary.hint'                       = '后续请在新终端使用 windots 命令管理环境（init / install / uninstall / update / clean / link / doctor / cd）'
 
     # --- 交互配置 ---
     'interactive.title'                  = '=== Windots 交互配置 ==='
@@ -193,6 +206,30 @@
     'install.plan.added.none'            = '新增包    : (无)'
     'install.state.missing.err'          = '未找到 state 文件，请先运行 windots init 完成初始化'
 
+    # --- 包卸载流程 ---
+    'uninstall.interactive.title'        = '=== Windots 包卸载 ==='
+    'uninstall.interactive.step.packages' = '--- 选择待卸载包（勾选即卸载）---'
+    'uninstall.plan.title'               = '=== 卸载计划摘要 ==='
+    'uninstall.plan.remaining'           = '保留包    : {0} 项 (scoop {1} 个)'
+    'uninstall.plan.removed'             = '移除包    : {0}'
+    'uninstall.plan.removed.none'        = '移除包    : (无)'
+    'uninstall.plan.apps'                = '卸载 scoop: {0}'
+    'uninstall.plan.apps.none'           = '卸载 scoop: (无)'
+    'uninstall.step.packages'            = '--- 卸载 scoop 包 ---'
+    'uninstall.none.selected'            = 'state 中无已选包，无需卸载'
+    'uninstall.nothing.todo'             = '未选择移除任何包，跳过卸载'
+    'uninstall.state.missing.err'        = '未找到 state 文件，请先运行 windots init 完成初始化'
+
+    # --- 清理 ---
+    'clean.title'                        = '=== windots clean ==='
+    'clean.logs.done'                    = '已清理 logs 目录 ({0} 项)'
+    'clean.logs.empty'                   = 'logs 目录为空，跳过'
+    'clean.backup.done'                  = '已清理 backup 目录 ({0} 项)'
+    'clean.backup.empty'                 = 'backup 目录为空，跳过'
+    'clean.state.done'                   = '已删除 state：{0}'
+    'clean.state.missing'                = 'state 文件不存在，跳过'
+    'clean.state.hint'                   = '提示：使用 windots clean -All 可同时删除 state'
+
     # --- 更新 ---
     'update.title'                       = '=== windots update ==='
     'update.windots.step'                = '--- 更新 windots ---'
@@ -231,7 +268,7 @@
     'setup.state.missing.err'            = '未找到 state 文件，请先运行 windots init 完成初始化'
     'setup.reconfigure.init.hint'        = '-Reconfigure 仅对 init 有效，请使用 windots init -Reconfigure'
     'setup.cmd.unknown'                  = '未知子命令：{0}'
-    'setup.cmd.hint'                     = '可用子命令：init, install (i), update (up), link, doctor, cd'
+    'setup.cmd.hint'                     = '可用子命令：init, install (i), uninstall (rm), update (up), clean, link, doctor, cd'
 
     # --- cd ---
     'cd.done'                            = '已进入 {0}'

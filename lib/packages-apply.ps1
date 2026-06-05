@@ -21,6 +21,66 @@ function Get-SelectedPackageItems {
     return @($allItems)
 }
 
+function Get-PackageItemScoopApps {
+    param([Parameter(Mandatory)] $PackageItem)
+
+    if ($PackageItem.Contains('Packages') -and $null -ne $PackageItem.Packages) {
+        return @($PackageItem.Packages | ForEach-Object { [string]$_ })
+    }
+    return @([string]$PackageItem.Name)
+}
+
+function Get-AllPackageItems {
+    param([Parameter(Mandatory)][hashtable] $PackagesDef)
+
+    return @(
+        @($PackagesDef.Recommended) + @($PackagesDef.Optional.Dev) + @($PackagesDef.Optional.Term) + @($PackagesDef.Optional.Beauty)
+    )
+}
+
+function Get-ScoopAppsForPackageNames {
+    param(
+        [Parameter(Mandatory)][hashtable] $PackagesDef,
+        [Parameter(Mandatory)][string[]] $PackageNames
+    )
+
+    $apps = [System.Collections.Generic.List[string]]::new()
+    foreach ($item in Get-AllPackageItems -PackagesDef $PackagesDef) {
+        if ($PackageNames -contains [string]$item.Name) {
+            foreach ($app in Get-PackageItemScoopApps -PackageItem $item) {
+                if (-not $apps.Contains($app)) { $apps.Add($app) }
+            }
+        }
+    }
+    return [string[]]@($apps)
+}
+
+function Get-ScoopAppsToUninstall {
+    param(
+        [Parameter(Mandatory)][hashtable] $PackagesDef,
+        [Parameter(Mandatory)][string[]] $RemovedPackageNames,
+        [Parameter(Mandatory)][string[]] $RemainingPackageNames
+    )
+
+    if (@($RemovedPackageNames).Count -eq 0) { return @() }
+
+    $stillNeeded = @{}
+    foreach ($app in (Get-ScoopAppsForPackageNames -PackagesDef $PackagesDef -PackageNames $RemainingPackageNames)) {
+        $stillNeeded[$app] = $true
+    }
+
+    $candidates = [System.Collections.Generic.List[string]]::new()
+    foreach ($item in Get-AllPackageItems -PackagesDef $PackagesDef) {
+        if ($RemovedPackageNames -contains [string]$item.Name) {
+            foreach ($app in Get-PackageItemScoopApps -PackageItem $item) {
+                if (-not $candidates.Contains($app)) { $candidates.Add($app) }
+            }
+        }
+    }
+
+    return [string[]]@($candidates | Where-Object { -not $stillNeeded.ContainsKey($_) })
+}
+
 function Set-WindotsSessionProxy {
     param([Parameter(Mandatory)] $State)
 

@@ -100,3 +100,33 @@ function Install-ScoopApp {
     Write-Success (msg 'scoop.app.ok' $displayName)
     return (New-ScoopStepResult -Status 'ok' -Detail (msg 'summary.detail.app.ok'))
 }
+
+function Uninstall-ScoopApp {
+    param(
+        [Parameter(Mandatory)][string] $Name,
+        [switch] $WhatIf
+    )
+    $displayName = Get-ScoopAppBaseName -Name $Name
+    if (-not (Test-ScoopInstalled -Name $Name)) {
+        Write-Warn (msg 'scoop.app.not.installed' $displayName)
+        return (New-ScoopStepResult -Status 'skipped' -Detail (msg 'summary.detail.app.not.installed'))
+    }
+    if ($WhatIf) {
+        Write-Plan "[WhatIf] scoop uninstall $Name"
+        return (New-ScoopStepResult -Status 'ok' -Detail (msg 'summary.detail.whatif'))
+    }
+    Write-Info (msg 'scoop.app.uninstalling' $displayName)
+    $safeName = $Name.Replace("'", "''")
+    $run = Invoke-CapturedPwshCommand -Command "scoop uninstall '$safeName'"
+    if ($run.ExitCode -ne 0) {
+        $rawErr = Get-CommandOutputError -Output $run.Output
+        if ([string]::IsNullOrWhiteSpace($rawErr)) {
+            $rawErr = (msg 'summary.detail.raw.unknown' $run.ExitCode)
+        }
+        Write-Err (msg 'scoop.app.uninstall.fail' $displayName $run.ExitCode)
+        return (New-ScoopStepResult -Status 'failed' -Detail $rawErr)
+    }
+    $Global:WindotsScoopList = $null
+    Write-Success (msg 'scoop.app.uninstalled' $displayName)
+    return (New-ScoopStepResult -Status 'ok' -Detail (msg 'summary.detail.app.uninstalled'))
+}

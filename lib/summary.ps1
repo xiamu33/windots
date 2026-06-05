@@ -17,9 +17,12 @@ function Write-SummaryStatusGroup {
     param(
         [Parameter(Mandatory)][string]   $TitleKey,
         [Parameter(Mandatory)][string]   $Status,
-        [Parameter(Mandatory)][object[]] $Items,
+        [Parameter(Mandatory)]
+        [AllowEmptyCollection()]
+        [object[]]                       $Items,
         [ConsoleColor]                   $Color = [ConsoleColor]::DarkGray,
-        [switch]                         $WithFailDetail
+        [switch]                         $WithFailDetail,
+        [string]                         $FailDetailKey = 'summary.detail.app.fail'
     )
 
     $statusItems = @($Items | Where-Object { $_.Status -eq $Status })
@@ -47,7 +50,7 @@ function Write-SummaryStatusGroup {
                     [string]$f.Detail
                 }
                 else {
-                    (msg 'summary.detail.app.fail')
+                    (msg $FailDetailKey)
                 }
                 [void]$lines.Add("  $detail")
             }
@@ -67,24 +70,35 @@ function Write-SummaryStatusGroup {
 
 function Show-Summary {
     param(
-        [Parameter(Mandatory)][object[]] $Results,
-        [string] $LogFile = ''
+        [Parameter(Mandatory)]
+        [AllowEmptyCollection()]
+        [object[]]                       $Results,
+        [string]                         $LogFile = '',
+        [ValidateSet('default', 'uninstall')]
+        [string]                         $Mode = 'default'
     )
     Write-Host ''
-    Write-Step (msg 'summary.title')
+    $titleKey = if ($Mode -eq 'uninstall') { 'summary.title.uninstall' } else { 'summary.title' }
+    Write-Step (msg $titleKey)
 
     $items = @($Results)
 
-    Write-SummaryStatusGroup -TitleKey 'summary.status.group.ok' -Status 'ok' -Items $items -Color Green
-    Write-SummaryStatusGroup -TitleKey 'summary.status.group.skip' -Status 'skipped' -Items $items
-    Write-SummaryStatusGroup -TitleKey 'summary.status.group.fail' -Status 'failed' -Items $items -Color Red -WithFailDetail
+    $okKey = if ($Mode -eq 'uninstall') { 'summary.status.group.ok.uninstall' } else { 'summary.status.group.ok' }
+    $skipKey = if ($Mode -eq 'uninstall') { 'summary.status.group.skip.uninstall' } else { 'summary.status.group.skip' }
+    $failKey = if ($Mode -eq 'uninstall') { 'summary.status.group.fail.uninstall' } else { 'summary.status.group.fail' }
+    $failDetailKey = if ($Mode -eq 'uninstall') { 'summary.detail.app.uninstall.fail' } else { 'summary.detail.app.fail' }
+
+    Write-SummaryStatusGroup -TitleKey $okKey -Status 'ok' -Items $items -Color Green
+    Write-SummaryStatusGroup -TitleKey $skipKey -Status 'skipped' -Items $items
+    Write-SummaryStatusGroup -TitleKey $failKey -Status 'failed' -Items $items -Color Red -WithFailDetail -FailDetailKey $failDetailKey
 
     $okCount = @($items | Where-Object { $_.Status -eq 'ok' }).Count
     $skipCount = @($items | Where-Object { $_.Status -eq 'skipped' }).Count
     $failCount = @($items | Where-Object { $_.Status -eq 'failed' }).Count
 
     Write-Host ''
-    Write-Info (msg 'summary.done' $okCount $skipCount $failCount)
+    $doneKey = if ($Mode -eq 'uninstall') { 'summary.done.uninstall' } else { 'summary.done' }
+    Write-Info (msg $doneKey $okCount $skipCount $failCount)
     if ($LogFile) { Write-Info (msg 'summary.log' $LogFile) }
     Write-Info (msg 'summary.hint')
 }
