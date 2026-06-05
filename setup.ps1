@@ -132,8 +132,8 @@ switch ($cmd) {
             Write-Err (msg 'install.state.missing.err')
             exit 1
         }
-        $state = Invoke-InteractivePackages -Ctx $ctx -State $state
-        Invoke-Install -Ctx $ctx -State $state
+        $plan = Invoke-InteractivePackages -Ctx $ctx -State $state
+        Invoke-Install -Ctx $ctx -Plan $plan
         exit 0
     }
     'uninstall' {

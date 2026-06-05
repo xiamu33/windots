@@ -44,6 +44,11 @@ function Invoke-Init {
     }
 
     Install-WindotsScoopApps -Ctx $Ctx -State $State -Results $results
+    $candidateNames = [string[]]@($State['Selected_Packages'] | ForEach-Object { [string]$_ })
+    Update-WindotsInstallState -State $State -PackagesDef $Ctx.Packages `
+        -BaseSelectedPackages @() `
+        -CandidatePackageNames $candidateNames `
+        -InstallResults @($results)
     Apply-WindotsDotfiles -Ctx $Ctx -State $State -Results $results
 
     if ([bool]$State.Chezmoi_Use -and -not [string]::IsNullOrWhiteSpace($State.Chezmoi_User)) {
@@ -83,6 +88,11 @@ function Invoke-Init {
                     Detail  = if ($chezmoiOk) { (msg 'summary.detail.chezmoi.ok') } else { (msg 'summary.detail.chezmoi.fail') }
                 })
         }
+    }
+
+    if (-not $Ctx.WhatIf) {
+        Save-WindotsState -Path $Ctx.StatePath -State $State
+        Write-Success (msg 'interactive.state.saved' $Ctx.StatePath)
     }
 
     Show-Summary -Results $results -LogFile $Ctx.LogFile

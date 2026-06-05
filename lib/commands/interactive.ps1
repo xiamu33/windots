@@ -78,7 +78,6 @@ function Get-InteractivePackageSelection {
         }
         else {
             $selectParams['NotInstalled'] = & $getNotInstalledNames $Items
-            $selectParams['Installed'] = & $getLockedNames $Items
         }
         Select-Items @selectParams
     }
@@ -128,7 +127,7 @@ function Invoke-InteractivePackages {
     Write-Step (msg 'interactive.step.packages')
     $selection = Get-InteractivePackageSelection -PackagesDef $pkg -SavedSelected $savedSelected
 
-    $newNames = @($selection.SelectedPkgNames | Where-Object { $savedSelected -notcontains $_ })
+    $newNames = [string[]]@($selection.SelectedPkgNames | Where-Object { $savedSelected -notcontains $_ })
 
     Clear-Host
     Write-Step (msg 'install.plan.title')
@@ -136,7 +135,7 @@ function Invoke-InteractivePackages {
         -SelectedNames $selection.SelectedPkgNames `
         -ScoopApps     $selection.ScoopApps `
         -PackagesDef   $pkg
-    if ($newNames.Count -gt 0) {
+    if (@($newNames).Count -gt 0) {
         Write-Plan (msg 'install.plan.added' ($newNames -join ', '))
     }
     else {
@@ -146,14 +145,12 @@ function Invoke-InteractivePackages {
 
     $State['Scoop_Apps'] = @($selection.ScoopApps | ForEach-Object { [string]$_ })
     $State['Selected_Packages'] = @($selection.SelectedPkgNames | ForEach-Object { [string]$_ })
-    $State['Timestamp'] = (Get-Date).ToString('s')
 
-    if (-not $Ctx.WhatIf) {
-        Save-WindotsState -Path $Ctx.StatePath -State $State
-        Write-Success (msg 'interactive.state.saved' $Ctx.StatePath)
+    return [pscustomobject]@{
+        PlannedState      = $State
+        SavedSelected     = [string[]]@($savedSelected | ForEach-Object { [string]$_ })
+        NewPackageNames   = $newNames
     }
-
-    return $State
 }
 
 function Invoke-InteractivePackagesUninstall {
@@ -174,6 +171,7 @@ function Invoke-InteractivePackagesUninstall {
             State                = $State
             RemovedPackages      = @()
             ScoopAppsToUninstall = @()
+            BlockedApps          = @()
         }
     }
 
@@ -192,24 +190,31 @@ function Invoke-InteractivePackagesUninstall {
             State                = $State
             RemovedPackages      = @()
             ScoopAppsToUninstall = @()
+            BlockedApps          = @()
         }
     }
 
     $remainingNames = [string[]]@($savedSelected | Where-Object { $removedNames -notcontains $_ })
-    $remainingScoopApps = Get-ScoopAppsForPackageNames -PackagesDef $pkg -PackageNames $remainingNames
-    $appsToRemove = [string[]]@(Get-ScoopAppsToUninstall `
+    $uninstallPlan = Get-UninstallScoopPlan `
         -PackagesDef           $pkg `
         -RemovedPackageNames    $removedNames `
-        -RemainingPackageNames  $remainingNames)
+        -RemainingPackageNames  $remainingNames
+    $appsToRemove = [string[]]@($uninstallPlan.ScoopAppsToUninstall)
+    $packagesPlannedForRemoval = Get-PackagesPlannedForRemoval `
+        -PackagesDef          $pkg `
+        -RemovedPackageNames  $removedNames `
+        -AppsToUninstall      $appsToRemove
+    $finalRemainingNames = [string[]]@($savedSelected | Where-Object { $packagesPlannedForRemoval -notcontains $_ })
+    $remainingScoopApps = Get-ScoopAppsForPackageNames -PackagesDef $pkg -PackageNames $finalRemainingNames
 
     Clear-Host
     Write-Step (msg 'uninstall.plan.title')
     Write-PackageList -TitleKey 'uninstall.plan.remaining' `
-        -SelectedNames $remainingNames `
+        -SelectedNames $finalRemainingNames `
         -ScoopApps     $remainingScoopApps `
         -PackagesDef   $pkg
-    if (@($removedNames).Count -gt 0) {
-        Write-Plan (msg 'uninstall.plan.removed' ($removedNames -join ', '))
+    if (@($packagesPlannedForRemoval).Count -gt 0) {
+        Write-Plan (msg 'uninstall.plan.removed' ($packagesPlannedForRemoval -join ', '))
     }
     else {
         Write-Plan (msg 'uninstall.plan.removed.none')
@@ -220,21 +225,18 @@ function Invoke-InteractivePackagesUninstall {
     else {
         Write-Plan (msg 'uninstall.plan.apps.none')
     }
+    foreach ($blocked in @($uninstallPlan.BlockedApps)) {
+        $appLabel = Get-ScoopAppBaseName -Name ([string]$blocked.App)
+        Write-Warn (msg 'uninstall.blocked.app' $appLabel ($blocked.RequiredBy -join ', '))
+    }
     Write-Info ''
 
-    $State['Scoop_Apps'] = @($remainingScoopApps | ForEach-Object { [string]$_ })
-    $State['Selected_Packages'] = @($remainingNames | ForEach-Object { [string]$_ })
-    $State['Timestamp'] = (Get-Date).ToString('s')
-
-    if (-not $Ctx.WhatIf) {
-        Save-WindotsState -Path $Ctx.StatePath -State $State
-        Write-Success (msg 'interactive.state.saved' $Ctx.StatePath)
-    }
-
     return [pscustomobject]@{
-        State                = $State
-        RemovedPackages      = @($removedNames | ForEach-Object { [string]$_ })
-        ScoopAppsToUninstall = @($appsToRemove | ForEach-Object { [string]$_ })
+        State                     = $State
+        SavedSelected             = [string[]]@($savedSelected | ForEach-Object { [string]$_ })
+        PackagesPlannedForRemoval = @($packagesPlannedForRemoval | ForEach-Object { [string]$_ })
+        ScoopAppsToUninstall      = @($appsToRemove | ForEach-Object { [string]$_ })
+        BlockedApps               = @($uninstallPlan.BlockedApps)
     }
 }
 
@@ -349,7 +351,7 @@ function Invoke-Interactive {
     Write-Info ''
 
     # ------------------------------------------------------------------
-    # 保存 state
+    # 返回计划（安装成功后再写入 state）
     # ------------------------------------------------------------------
     $state = @{
         Proxy_Enabled     = [bool]$useProxy
@@ -363,10 +365,6 @@ function Invoke-Interactive {
         Conflict_Mode     = [string]$conflictMode
         Link_Mode         = [string]$linkMode
         Timestamp         = (Get-Date).ToString('s')
-    }
-    if (-not $Ctx.WhatIf) {
-        Save-WindotsState -Path $Ctx.StatePath -State $state
-        Write-Success (msg 'interactive.state.saved' $Ctx.StatePath)
     }
 
     return $state

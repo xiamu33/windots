@@ -132,7 +132,8 @@ function Select-Items {
             $sfx = if ($SuffixLabeler) { [string](& $SuffixLabeler $Items[$i]) } else { '' }
             if ($Disabled -contains $label) { continue }
             if ($NotInstalled -contains $label) {
-                $w = Get-DisplayWidth ("  [ ] $label$sfx")
+                $arrow = if ($i -eq $cursor) { '>' } else { ' ' }
+                $w = Get-DisplayWidth ("$arrow [ ] $label$sfx")
                 if ($w -gt $installedTagBaseWidth) { $installedTagBaseWidth = $w }
                 continue
             }
@@ -158,7 +159,7 @@ function Select-Items {
                 Write-Host ("  [ ] $label  $unsupportedTag") -ForegroundColor DarkGray
             }
             elseif ($isNotInstalled) {
-                $lineText = "  [ ] $label$sfx"
+                $lineText = "$arrow [ ] $label$sfx"
                 $lineWidth = Get-DisplayWidth $lineText
                 if ($tagBaseWidth -gt 0) {
                     Write-Host -NoNewline ($lineText + (' ' * [Math]::Max(0, ($tagBaseWidth - $lineWidth)))) -ForegroundColor DarkGray

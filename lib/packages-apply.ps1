@@ -55,6 +55,182 @@ function Get-ScoopAppsForPackageNames {
     return [string[]]@($apps)
 }
 
+function Get-PackagesPlannedForRemoval {
+    param(
+        [Parameter(Mandatory)][hashtable] $PackagesDef,
+        [Parameter(Mandatory)]
+        [AllowEmptyCollection()]
+        [string[]]                             $RemovedPackageNames,
+        [Parameter(Mandatory)]
+        [AllowEmptyCollection()]
+        [string[]]                             $AppsToUninstall
+    )
+
+    $appsSet = @{}
+    foreach ($app in @($AppsToUninstall)) { $appsSet[$app] = $true }
+
+    $planned = [System.Collections.Generic.List[string]]::new()
+    foreach ($name in @($RemovedPackageNames)) {
+        $pkgApps = Get-ScoopAppsForPackageNames -PackagesDef $PackagesDef -PackageNames @([string]$name)
+        foreach ($app in $pkgApps) {
+            if ($appsSet.ContainsKey($app)) {
+                $planned.Add([string]$name)
+                break
+            }
+        }
+    }
+    return [string[]]@($planned)
+}
+
+function Get-PackagesActuallyUninstalled {
+    param(
+        [Parameter(Mandatory)][hashtable] $PackagesDef,
+        [Parameter(Mandatory)]
+        [AllowEmptyCollection()]
+        [string[]]                             $CandidatePackageNames,
+        [Parameter(Mandatory)]
+        [AllowEmptyCollection()]
+        [string[]]                             $AppsToUninstall,
+        [Parameter(Mandatory)]
+        [AllowEmptyCollection()]
+        [object[]]                               $UninstallResults
+    )
+
+    $appsSet = @{}
+    foreach ($app in @($AppsToUninstall)) { $appsSet[$app] = $true }
+
+    $resultByLabel = @{}
+    foreach ($r in @($UninstallResults)) {
+        if ([string]$r.Section -ne 'packages') { continue }
+        $resultByLabel[[string]$r.Label] = [string]$r.Status
+    }
+
+    $removed = [System.Collections.Generic.List[string]]::new()
+    foreach ($name in @($CandidatePackageNames)) {
+        $pkgApps = Get-ScoopAppsForPackageNames -PackagesDef $PackagesDef -PackageNames @([string]$name)
+        $attempted = 0
+        $succeeded = $true
+        foreach ($app in $pkgApps) {
+            if (-not $appsSet.ContainsKey($app)) { continue }
+            $label = Get-ScoopAppBaseName -Name ([string]$app)
+            if (-not $resultByLabel.ContainsKey($label)) { continue }
+            $attempted++
+            if ($resultByLabel[$label] -eq 'failed') {
+                $succeeded = $false
+                break
+            }
+        }
+        if ($succeeded -and $attempted -gt 0) {
+            $removed.Add([string]$name)
+        }
+    }
+    return [string[]]@($removed)
+}
+
+function Update-WindotsUninstallState {
+    param(
+        [Parameter(Mandatory)]                 $State,
+        [Parameter(Mandatory)][hashtable]      $PackagesDef,
+        [Parameter(Mandatory)]
+        [AllowEmptyCollection()]
+        [string[]]                             $BaseSelectedPackages,
+        [Parameter(Mandatory)]
+        [AllowEmptyCollection()]
+        [string[]]                             $CandidatePackageNames,
+        [Parameter(Mandatory)]
+        [AllowEmptyCollection()]
+        [string[]]                             $AppsToUninstall,
+        [Parameter(Mandatory)]
+        [AllowEmptyCollection()]
+        [object[]]                               $UninstallResults
+    )
+
+    $removed = Get-PackagesActuallyUninstalled -PackagesDef $PackagesDef `
+        -CandidatePackageNames $CandidatePackageNames `
+        -AppsToUninstall $AppsToUninstall `
+        -UninstallResults $UninstallResults
+
+    $finalRemaining = [System.Collections.Generic.List[string]]::new()
+    foreach ($n in @($BaseSelectedPackages | ForEach-Object { [string]$_ })) {
+        if ($removed -notcontains $n) {
+            if (-not $finalRemaining.Contains($n)) { $finalRemaining.Add($n) }
+        }
+    }
+
+    $State['Selected_Packages'] = [string[]]@($finalRemaining)
+    $State['Scoop_Apps'] = Get-ScoopAppsForPackageNames -PackagesDef $PackagesDef -PackageNames $State['Selected_Packages']
+    $State['Timestamp'] = (Get-Date).ToString('s')
+    return [string[]]@($removed)
+}
+
+function Get-UninstallScoopPlan {
+    param(
+        [Parameter(Mandatory)][hashtable] $PackagesDef,
+        [Parameter(Mandatory)][string[]] $RemovedPackageNames,
+        [Parameter(Mandatory)][string[]] $RemainingPackageNames
+    )
+
+    if (@($RemovedPackageNames).Count -eq 0) {
+        return [pscustomobject]@{
+            ScoopAppsToUninstall = [string[]]@()
+            BlockedApps          = @()
+        }
+    }
+
+    $appRequiredBy = @{}
+    foreach ($item in Get-AllPackageItems -PackagesDef $PackagesDef) {
+        if ($RemainingPackageNames -notcontains [string]$item.Name) { continue }
+        foreach ($app in Get-PackageItemScoopApps -PackageItem $item) {
+            if (-not $appRequiredBy.ContainsKey($app)) {
+                $appRequiredBy[$app] = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+            }
+            [void]$appRequiredBy[$app].Add([string]$item.Name)
+        }
+    }
+
+    $toUninstall = [System.Collections.Generic.List[string]]::new()
+    $blocked = [System.Collections.Generic.List[object]]::new()
+
+    foreach ($item in Get-AllPackageItems -PackagesDef $PackagesDef) {
+        if ($RemovedPackageNames -notcontains [string]$item.Name) { continue }
+        foreach ($app in Get-PackageItemScoopApps -PackageItem $item) {
+            if ($appRequiredBy.ContainsKey($app)) {
+                $blocked.Add([pscustomobject]@{
+                        PackageName = [string]$item.Name
+                        App         = [string]$app
+                        RequiredBy  = [string[]]@($appRequiredBy[$app] | Sort-Object)
+                    })
+            }
+            elseif (-not $toUninstall.Contains($app)) {
+                $toUninstall.Add($app)
+            }
+        }
+    }
+
+    $blockedDeduped = [System.Collections.Generic.List[object]]::new()
+    $blockedSeen = @{}
+    foreach ($entry in $blocked) {
+        $key = [string]$entry.App
+        if ($blockedSeen.ContainsKey($key)) { continue }
+        $blockedSeen[$key] = $true
+        $requiredBy = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+        foreach ($other in $blocked) {
+            if ([string]$other.App -ieq $key) {
+                foreach ($p in @($other.RequiredBy)) { [void]$requiredBy.Add([string]$p) }
+            }
+        }
+        $blockedDeduped.Add([pscustomobject]@{
+                App        = $key
+                RequiredBy = [string[]]@($requiredBy | Sort-Object)
+            })
+    }
+
+    return [pscustomobject]@{
+        ScoopAppsToUninstall = [string[]]@($toUninstall)
+        BlockedApps          = @($blockedDeduped)
+    }
+}
+
 function Get-ScoopAppsToUninstall {
     param(
         [Parameter(Mandatory)][hashtable] $PackagesDef,
@@ -62,23 +238,78 @@ function Get-ScoopAppsToUninstall {
         [Parameter(Mandatory)][string[]] $RemainingPackageNames
     )
 
-    if (@($RemovedPackageNames).Count -eq 0) { return @() }
+    return (Get-UninstallScoopPlan -PackagesDef $PackagesDef `
+            -RemovedPackageNames $RemovedPackageNames `
+            -RemainingPackageNames $RemainingPackageNames).ScoopAppsToUninstall
+}
 
-    $stillNeeded = @{}
-    foreach ($app in (Get-ScoopAppsForPackageNames -PackagesDef $PackagesDef -PackageNames $RemainingPackageNames)) {
-        $stillNeeded[$app] = $true
+function Get-PackagesActuallyInstalled {
+    param(
+        [Parameter(Mandatory)][hashtable] $PackagesDef,
+        [Parameter(Mandatory)]
+        [AllowEmptyCollection()]
+        [string[]]                             $CandidatePackageNames,
+        [Parameter(Mandatory)]
+        [AllowEmptyCollection()]
+        [object[]]                               $InstallResults
+    )
+
+    $resultByLabel = @{}
+    foreach ($r in @($InstallResults)) {
+        if ([string]$r.Section -ne 'packages') { continue }
+        $resultByLabel[[string]$r.Label] = [string]$r.Status
     }
 
-    $candidates = [System.Collections.Generic.List[string]]::new()
-    foreach ($item in Get-AllPackageItems -PackagesDef $PackagesDef) {
-        if ($RemovedPackageNames -contains [string]$item.Name) {
-            foreach ($app in Get-PackageItemScoopApps -PackageItem $item) {
-                if (-not $candidates.Contains($app)) { $candidates.Add($app) }
+    $installed = [System.Collections.Generic.List[string]]::new()
+    foreach ($name in @($CandidatePackageNames)) {
+        $pkgApps = Get-ScoopAppsForPackageNames -PackagesDef $PackagesDef -PackageNames @([string]$name)
+        $attempted = 0
+        $succeeded = $true
+        foreach ($app in $pkgApps) {
+            $label = Get-ScoopAppBaseName -Name ([string]$app)
+            if (-not $resultByLabel.ContainsKey($label)) { continue }
+            $attempted++
+            if ($resultByLabel[$label] -eq 'failed') {
+                $succeeded = $false
+                break
             }
         }
+        if ($succeeded -and $attempted -gt 0) {
+            $installed.Add([string]$name)
+        }
+    }
+    return [string[]]@($installed)
+}
+
+function Update-WindotsInstallState {
+    param(
+        [Parameter(Mandatory)]                 $State,
+        [Parameter(Mandatory)][hashtable]      $PackagesDef,
+        [Parameter(Mandatory)]
+        [AllowEmptyCollection()]
+        [string[]]                             $BaseSelectedPackages,
+        [Parameter(Mandatory)]
+        [AllowEmptyCollection()]
+        [string[]]                             $CandidatePackageNames,
+        [Parameter(Mandatory)]
+        [AllowEmptyCollection()]
+        [object[]]                               $InstallResults
+    )
+
+    $added = Get-PackagesActuallyInstalled -PackagesDef $PackagesDef `
+        -CandidatePackageNames $CandidatePackageNames -InstallResults $InstallResults
+
+    $finalSelected = [System.Collections.Generic.List[string]]::new()
+    foreach ($n in @($BaseSelectedPackages | ForEach-Object { [string]$_ })) {
+        if (-not $finalSelected.Contains($n)) { $finalSelected.Add($n) }
+    }
+    foreach ($n in @($added)) {
+        if (-not $finalSelected.Contains($n)) { $finalSelected.Add($n) }
     }
 
-    return [string[]]@($candidates | Where-Object { -not $stillNeeded.ContainsKey($_) })
+    $State['Selected_Packages'] = [string[]]@($finalSelected)
+    $State['Scoop_Apps'] = Get-ScoopAppsForPackageNames -PackagesDef $PackagesDef -PackageNames $State['Selected_Packages']
+    $State['Timestamp'] = (Get-Date).ToString('s')
 }
 
 function Set-WindotsSessionProxy {

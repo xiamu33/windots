@@ -29,6 +29,27 @@ function Uninstall-WindotsScoopApps {
     }
 }
 
+function Add-UninstallBlockedResults {
+    param(
+        [Parameter(Mandatory)][pscustomobject] $Ctx,
+        [Parameter(Mandatory)]                 $Results,
+        [Parameter(Mandatory)]                 $BlockedApps
+    )
+
+    foreach ($blocked in @($BlockedApps)) {
+        $appName = [string]$blocked.App
+        $pkgItem = Find-PackageItemByScoopName -PackagesDef $Ctx.Packages -ScoopName $appName
+        $desc = if ($pkgItem) { Get-PackageDesc -Package $pkgItem } else { '' }
+        $Results.Add([pscustomobject]@{
+                Section = 'packages'
+                Label   = Get-ScoopAppBaseName -Name $appName
+                Desc    = $desc
+                Status  = 'skipped'
+                Detail  = (msg 'summary.detail.app.uninstall.blocked' ($blocked.RequiredBy -join ', '))
+            })
+    }
+}
+
 function Invoke-Uninstall {
     param(
         [Parameter(Mandatory)][pscustomobject] $Ctx,
@@ -36,14 +57,26 @@ function Invoke-Uninstall {
     )
 
     $plan = Invoke-InteractivePackagesUninstall -Ctx $Ctx -State $State
-    if (@($plan.RemovedPackages).Count -eq 0) {
+    if (@($plan.ScoopAppsToUninstall).Count -eq 0 -and @($plan.BlockedApps).Count -eq 0) {
         Write-Info (msg 'uninstall.nothing.todo')
         return
     }
 
     $results = [System.Collections.Generic.List[object]]::new()
     Set-WindotsSessionProxy -State $plan.State
+    Add-UninstallBlockedResults -Ctx $Ctx -Results $results -BlockedApps @($plan.BlockedApps)
     Uninstall-WindotsScoopApps -Ctx $Ctx -AppNames ([string[]]@($plan.ScoopAppsToUninstall | ForEach-Object { [string]$_ })) -Results $results
+
+    $actuallyRemoved = Update-WindotsUninstallState -State $plan.State -PackagesDef $Ctx.Packages `
+        -BaseSelectedPackages $plan.SavedSelected `
+        -CandidatePackageNames $plan.PackagesPlannedForRemoval `
+        -AppsToUninstall @($plan.ScoopAppsToUninstall | ForEach-Object { [string]$_ }) `
+        -UninstallResults @($results)
+
+    if (-not $Ctx.WhatIf -and @($actuallyRemoved).Count -gt 0) {
+        Save-WindotsState -Path $Ctx.StatePath -State $plan.State
+        Write-Success (msg 'interactive.state.saved' $Ctx.StatePath)
+    }
 
     Show-Summary -Results $results -LogFile $Ctx.LogFile -Mode 'uninstall'
 }
