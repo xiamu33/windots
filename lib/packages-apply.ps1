@@ -47,7 +47,7 @@ function Install-WindotsScoopApps {
         $desc = if ($pkgItem) { Get-PackageDesc -Package $pkgItem } else { '' }
         $Results.Add([pscustomobject]@{
                 Section = 'packages'
-                Label   = [string]$name
+                Label   = Get-ScoopAppBaseName -Name ([string]$name)
                 Desc    = $desc
                 Status  = [string]$appResult.Status
                 Detail  = [string]$appResult.Detail

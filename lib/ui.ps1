@@ -621,6 +621,12 @@ function Get-PackageTableWidth {
     return Get-ConsoleTableWidth
 }
 
+function Test-ScoopAppHiddenInTable {
+    param([Parameter(Mandatory)][string] $Name)
+    # chezmoi 在启用同步时自动加入 Scoop_Apps，非用户手动勾选的包
+    return (Get-ScoopAppBaseName -Name $Name) -ieq 'chezmoi'
+}
+
 # 按 packages.psd1 分组展示已选安装包（计划摘要 / 已保存配置）
 function Write-PackageList {
     param(
@@ -637,7 +643,9 @@ function Write-PackageList {
         }
     }
 
-    $scoopList = @($ScoopApps | ForEach-Object { [string]$_ } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+    $scoopList = @($ScoopApps | ForEach-Object { [string]$_ } | Where-Object {
+            -not [string]::IsNullOrWhiteSpace($_) -and -not (Test-ScoopAppHiddenInTable -Name $_)
+        })
     $itemCount = if ($selectedSet.Count -gt 0) { $selectedSet.Count } else { $scoopList.Count }
     $scoopCount = if ($scoopList.Count -gt 0) { $scoopList.Count } else { $itemCount }
     Write-Plan (msg $TitleKey $itemCount $scoopCount)
@@ -647,7 +655,7 @@ function Write-PackageList {
     if ($selectedSet.Count -eq 0) {
         $seq = 1
         $fallbackRows = @($scoopList | ForEach-Object {
-                $row = @([string]$seq, [string]$_)
+                $row = @([string]$seq, (Get-ScoopAppBaseName -Name ([string]$_)))
                 $seq++
                 , $row
             })
@@ -680,8 +688,12 @@ function Write-PackageList {
             if ($item.Contains('Packages') -and $null -ne $item.Packages) {
                 $pkgNames = @($item.Packages | ForEach-Object { [string]$_ })
                 foreach ($p in $pkgNames) { [void]$resolvedScoop.Add($p) }
-                $extraPkgs = @($pkgNames | Where-Object { $_ -ne $name })
-                if ($extraPkgs.Count -gt 0) { $deps = $extraPkgs -join ', ' }
+                $extraPkgs = @($pkgNames | Where-Object {
+                        (Get-ScoopAppBaseName -Name $_) -ine $name
+                    })
+                if ($extraPkgs.Count -gt 0) {
+                    $deps = @($extraPkgs | ForEach-Object { Get-ScoopAppBaseName -Name $_ }) -join ', '
+                }
             }
             else {
                 [void]$resolvedScoop.Add($name)
@@ -693,7 +705,7 @@ function Write-PackageList {
 
     $extras = @($scoopList | Where-Object { -not $resolvedScoop.Contains([string]$_) })
     foreach ($name in $extras) {
-        [void]$tableRows.Add(@([string]$seq, $name, '', ''))
+        [void]$tableRows.Add(@([string]$seq, (Get-ScoopAppBaseName -Name ([string]$name)), '', ''))
         $seq++
     }
 

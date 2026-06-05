@@ -76,15 +76,16 @@ function Install-ScoopApp {
         [Parameter(Mandatory)][string] $Name,
         [switch] $WhatIf
     )
+    $displayName = Get-ScoopAppBaseName -Name $Name
     if (Test-ScoopInstalled -Name $Name) {
-        Write-Success (msg 'scoop.app.installed' $Name)
+        Write-Success (msg 'scoop.app.installed' $displayName)
         return (New-ScoopStepResult -Status 'skipped' -Detail (msg 'summary.detail.app.skip'))
     }
     if ($WhatIf) {
         Write-Plan "[WhatIf] scoop install $Name"
         return (New-ScoopStepResult -Status 'ok' -Detail (msg 'summary.detail.whatif'))
     }
-    Write-Info (msg 'scoop.app.installing' $Name)
+    Write-Info (msg 'scoop.app.installing' $displayName)
     $safeName = $Name.Replace("'", "''")
     $run = Invoke-CapturedPwshCommand -Command "scoop install '$safeName'"
     if ($run.ExitCode -ne 0) {
@@ -92,10 +93,10 @@ function Install-ScoopApp {
         if ([string]::IsNullOrWhiteSpace($rawErr)) {
             $rawErr = (msg 'summary.detail.raw.unknown' $run.ExitCode)
         }
-        Write-Err (msg 'scoop.app.fail' $Name $run.ExitCode)
+        Write-Err (msg 'scoop.app.fail' $displayName $run.ExitCode)
         return (New-ScoopStepResult -Status 'failed' -Detail $rawErr)
     }
     $Global:WindotsScoopList = $null
-    Write-Success (msg 'scoop.app.ok' $Name)
+    Write-Success (msg 'scoop.app.ok' $displayName)
     return (New-ScoopStepResult -Status 'ok' -Detail (msg 'summary.detail.app.ok'))
 }

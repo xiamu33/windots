@@ -94,7 +94,11 @@
                     @{ Src = 'dotfiles/yasb/styles.css'; Dest = 'HOME\.config\yasb\styles.css' }
                 )
             }
-            @{ Name = 'flow-launcher'; Default = $false }
+            @{ 
+                Name     = 'flow-launcher'
+                Default  = $false
+                Packages = 'extras/Flow-Launcher'
+            }
         )
     }
 

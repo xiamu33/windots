@@ -69,9 +69,17 @@ function Get-WindotsScoopList {
     return $map
 }
 
+function Get-ScoopAppBaseName {
+    param([Parameter(Mandatory)][string] $Name)
+    $idx = $Name.IndexOf('/')
+    if ($idx -ge 0) { return $Name.Substring($idx + 1) }
+    return $Name
+}
+
 function Test-ScoopInstalled {
     param([Parameter(Mandatory)][string] $Name)
-    return (Get-WindotsScoopList).ContainsKey($Name.ToLowerInvariant())
+    $base = Get-ScoopAppBaseName -Name $Name
+    return (Get-WindotsScoopList).ContainsKey($base.ToLowerInvariant())
 }
 
 function Get-WindotsBucketList {
