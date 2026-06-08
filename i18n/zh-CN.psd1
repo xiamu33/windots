@@ -161,7 +161,7 @@
     'interactive.packages.beauty.title'  = '可选 - 美化工具：'
     'interactive.step.chezmoi'           = '--- 5/6 chezmoi 配置同步 ---'
     'interactive.chezmoi.prompt'         = '是否使用 chezmoi 同步跨平台配置（nvim/starship/wezterm 等）？'
-    'interactive.chezmoi.user.prompt'    = 'GitHub 用户名'
+    'interactive.chezmoi.user.prompt'    = 'GitHub 用户名或仓库地址'
     'interactive.chezmoi.apply.prompt'   = '是否立即 --apply（拉取并应用配置）？'
     'interactive.step.config'            = '--- 6/6 配置文件应用方式 ---'
     'interactive.conflict.title'         = '已存在的配置文件如何处理？'
@@ -194,7 +194,7 @@
     'init.config.src.skip'               = '配置源不存在，跳过：{0}'
     'init.step.chezmoi'                  = '--- 初始化 chezmoi ---'
     'init.chezmoi.missing'               = 'chezmoi 未找到，跳过（请确认已在包列表中选择 chezmoi）'
-    'init.chezmoi.init'                  = 'chezmoi init {0}/{1}'
+    'init.chezmoi.init'                  = 'chezmoi init {0}'
 
     # --- 包安装流程 ---
     'install.interactive.title'          = '=== Windots 包选择 ==='

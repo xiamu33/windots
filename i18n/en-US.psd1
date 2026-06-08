@@ -161,7 +161,7 @@
     'interactive.packages.beauty.title'  = 'Optional - Appearance:'
     'interactive.step.chezmoi'           = '--- 5/6 chezmoi Config Sync ---'
     'interactive.chezmoi.prompt'         = 'Use chezmoi to sync cross-platform configs (nvim/starship/wezterm etc.)?'
-    'interactive.chezmoi.user.prompt'    = 'GitHub username'
+    'interactive.chezmoi.user.prompt'    = 'GitHub username or repo URL'
     'interactive.chezmoi.apply.prompt'   = 'Run --apply immediately (pull and apply config)?'
     'interactive.step.config'            = '--- 6/6 Config File Application ---'
     'interactive.conflict.title'         = 'How to handle existing config files?'
@@ -194,7 +194,7 @@
     'init.config.src.skip'               = 'Config source missing, skipping: {0}'
     'init.step.chezmoi'                  = '--- Initializing chezmoi ---'
     'init.chezmoi.missing'               = 'chezmoi not found, skipping (make sure chezmoi is in the package list)'
-    'init.chezmoi.init'                  = 'chezmoi init {0}/{1}'
+    'init.chezmoi.init'                  = 'chezmoi init {0}'
 
     # --- Install (packages) ---
     'install.interactive.title'          = '=== Windots Package Selection ==='

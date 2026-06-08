@@ -147,9 +147,9 @@ function Invoke-InteractivePackages {
     $State['Selected_Packages'] = @($selection.SelectedPkgNames | ForEach-Object { [string]$_ })
 
     return [pscustomobject]@{
-        PlannedState      = $State
-        SavedSelected     = [string[]]@($savedSelected | ForEach-Object { [string]$_ })
-        NewPackageNames   = $newNames
+        PlannedState    = $State
+        SavedSelected   = [string[]]@($savedSelected | ForEach-Object { [string]$_ })
+        NewPackageNames = $newNames
     }
 }
 
@@ -298,7 +298,7 @@ function Invoke-Interactive {
     # 5. chezmoi
     # ------------------------------------------------------------------
     Write-Step (msg 'interactive.step.chezmoi')
-    $useChezmoi = Read-YesNo -Prompt (msg 'interactive.chezmoi.prompt') -Default $false
+    $useChezmoi = Read-YesNo -Prompt (msg 'interactive.chezmoi.prompt') -Default ([bool]$set.Chezmoi.Enabled)
     $chezmoiUser = ''
     $chezmoiApply = $true
     if ($useChezmoi) {
@@ -345,7 +345,7 @@ function Invoke-Interactive {
         -SelectedNames $selectedPkgNames `
         -ScoopApps     $scoopApps `
         -PackagesDef   $pkg
-    Write-Plan (msg 'interactive.plan.chezmoi'  $(if ($useChezmoi) { "$chezmoiUser/$($set.Chezmoi.RepoName)" } else { msg 'interactive.plan.chezmoi.skip' }))
+    Write-Plan (msg 'interactive.plan.chezmoi'  $(if ($useChezmoi) { $chezmoiUser } else { msg 'interactive.plan.chezmoi.skip' }))
     Write-Plan (msg 'interactive.plan.conflict' $conflictMode)
     Write-Plan (msg 'interactive.plan.linkmode' $linkMode)
     Write-Info ''

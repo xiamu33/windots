@@ -53,10 +53,9 @@ function Invoke-Init {
 
     if ([bool]$State.Chezmoi_Use -and -not [string]::IsNullOrWhiteSpace($State.Chezmoi_User)) {
         Write-Step (msg 'init.step.chezmoi')
-        $repoName = [string]$Ctx.Settings.Chezmoi.RepoName
         $user = [string]$State.Chezmoi_User
         $apply = [bool]$State.Chezmoi_Apply
-        $chezmoiLabel = "$(msg 'summary.label.chezmoi') ($user/$repoName)"
+        $chezmoiLabel = "$(msg 'summary.label.chezmoi') ($user)"
 
         if (-not (Test-CommandExists -Name 'chezmoi')) {
             Write-Warn (msg 'init.chezmoi.missing')
@@ -68,7 +67,7 @@ function Invoke-Init {
                 })
         }
         elseif ($Ctx.WhatIf) {
-            Write-Plan "[WhatIf] $(msg 'init.chezmoi.init' $user $repoName)$(if ($apply) {' --apply'})"
+            Write-Plan "[WhatIf] $(msg 'init.chezmoi.init' $user)$(if ($apply) {' --apply'})"
             $results.Add([pscustomobject]@{
                     Section = 'chezmoi'
                     Label   = $chezmoiLabel
@@ -77,9 +76,9 @@ function Invoke-Init {
                 })
         }
         else {
-            Write-Info (msg 'init.chezmoi.init' $user $repoName)
-            if ($apply) { & chezmoi init --apply "$user/$repoName" }
-            else { & chezmoi init "$user/$repoName" }
+            Write-Info (msg 'init.chezmoi.init' $user)
+            if ($apply) { & chezmoi init --apply $user }
+            else { & chezmoi init $user }
             $chezmoiOk = ($LASTEXITCODE -eq 0)
             $results.Add([pscustomobject]@{
                     Section = 'chezmoi'
