@@ -23,7 +23,7 @@ function Invoke-Init {
             })
     }
     else {
-        $scoopResult = Install-Scoop -UseMirror:([bool]$State.Scoop_Mirror) -WhatIf:$Ctx.WhatIf
+        $scoopResult = Install-Scoop -ScoopConfig $Ctx.Settings.Scoop -UseMirror:([bool]$State.Scoop_Mirror) -WhatIf:$Ctx.WhatIf
         $results.Add([pscustomobject]@{
                 Section = 'scoop'
                 Label   = 'scoop'
@@ -34,12 +34,23 @@ function Invoke-Init {
 
     if ([bool]$State.Scoop_Mirror -and ((Test-CommandExists -Name 'scoop') -or $Ctx.WhatIf)) {
         Write-Step (msg 'init.step.mirror')
-        $mirrorResult = Switch-ScoopMirror -WhatIf:$Ctx.WhatIf
+        $mirrorResult = Switch-ScoopMirror -ScoopConfig $Ctx.Settings.Scoop -WhatIf:$Ctx.WhatIf
         $results.Add([pscustomobject]@{
                 Section = 'mirror'
                 Label   = (msg 'summary.label.mirror')
                 Status  = [string]$mirrorResult.Status
                 Detail  = [string]$mirrorResult.Detail
+            })
+    }
+
+    if ((Test-CommandExists -Name 'scoop') -or $Ctx.WhatIf) {
+        Write-Step (msg 'init.step.buckets')
+        $bucketResult = Install-ScoopBuckets -ScoopConfig $Ctx.Settings.Scoop -WhatIf:$Ctx.WhatIf
+        $results.Add([pscustomobject]@{
+                Section = 'buckets'
+                Label   = (msg 'summary.label.buckets')
+                Status  = [string]$bucketResult.Status
+                Detail  = [string]$bucketResult.Detail
             })
     }
 

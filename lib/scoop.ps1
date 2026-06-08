@@ -10,8 +10,43 @@ function New-ScoopStepResult {
     return [pscustomobject]@{ Status = $Status; Detail = $Detail }
 }
 
+function Resolve-ScoopBucketEntry {
+    param([Parameter(Mandatory)] $Entry)
+
+    if ($Entry -is [string]) {
+        $name = $Entry.Trim()
+        if ([string]::IsNullOrWhiteSpace($name)) { return $null }
+        return [pscustomobject]@{ Name = $name; Url = $null }
+    }
+    if ($Entry -is [System.Collections.IDictionary]) {
+        $name = [string]$Entry.Name
+        if ([string]::IsNullOrWhiteSpace($name)) { return $null }
+        $url = $null
+        if ($Entry.Contains('Url') -and -not [string]::IsNullOrWhiteSpace([string]$Entry.Url)) {
+            $url = [string]$Entry.Url
+        }
+        return [pscustomobject]@{ Name = $name; Url = $url }
+    }
+    return $null
+}
+
+function Get-ScoopConfigValue {
+    param(
+        [Parameter(Mandatory)] $ScoopConfig,
+        [Parameter(Mandatory)][string] $Key,
+        [Parameter(Mandatory)][string] $Default
+    )
+    if ($null -eq $ScoopConfig) { return $Default }
+    if ($ScoopConfig -is [System.Collections.IDictionary] -and $ScoopConfig.Contains($Key)) {
+        $value = [string]$ScoopConfig[$Key]
+        if (-not [string]::IsNullOrWhiteSpace($value)) { return $value }
+    }
+    return $Default
+}
+
 function Install-Scoop {
     param(
+        $ScoopConfig,
         [switch] $UseMirror,
         [switch] $WhatIf
     )
@@ -25,7 +60,7 @@ function Install-Scoop {
     }
 
     $officialUrl = 'https://get.scoop.sh'
-    $mirrorUrl = 'https://gitee.com/scoop-installer/install/raw/master/install.ps1'
+    $mirrorUrl = Get-ScoopConfigValue -ScoopConfig $ScoopConfig -Key 'MirrorUrl' -Default 'https://gitee.com/scoop-installer/install/raw/master/install.ps1'
     $srcUrl = if ($UseMirror) { $mirrorUrl } else { $officialUrl }
 
     if ($WhatIf) {
@@ -42,14 +77,17 @@ function Install-Scoop {
 }
 
 function Switch-ScoopMirror {
-    param([switch] $WhatIf)
+    param(
+        $ScoopConfig,
+        [switch] $WhatIf
+    )
 
-    $giteeRepo = 'https://gitee.com/scoop-installer/scoop'
+    $giteeRepo = Get-ScoopConfigValue -ScoopConfig $ScoopConfig -Key 'GiteeRepo' -Default 'https://gitee.com/scoop-installer/scoop'
 
     if ($WhatIf) {
         Write-Plan "[WhatIf] scoop config SCOOP_REPO `"$giteeRepo`""
         Write-Plan '[WhatIf] scoop update'
-        Write-Plan '[WhatIf] scoop bucket rm main; scoop bucket add main; scoop bucket add extras'
+        Write-Plan '[WhatIf] scoop bucket rm main; scoop bucket add main'
         return (New-ScoopStepResult -Status 'ok' -Detail (msg 'summary.detail.whatif'))
     }
 
@@ -62,13 +100,73 @@ function Switch-ScoopMirror {
     Write-Info (msg 'scoop.mirror.switching')
     & scoop config SCOOP_REPO $giteeRepo
     & scoop update
-    & scoop bucket rm main   2>$null
+    & scoop bucket rm main 2>$null
     & scoop bucket add main
-    & scoop bucket add extras 2>$null
-
     $Global:WindotsBucketList = $null
+
     Write-Success (msg 'scoop.mirror.done')
     return (New-ScoopStepResult -Status 'ok' -Detail (msg 'summary.detail.mirror.ok'))
+}
+
+function Install-ScoopBuckets {
+    param(
+        $ScoopConfig,
+        [switch] $WhatIf
+    )
+
+    $rawBuckets = @()
+    if ($null -ne $ScoopConfig -and $ScoopConfig -is [System.Collections.IDictionary] -and $ScoopConfig.Contains('Buckets')) {
+        $rawBuckets = @($ScoopConfig.Buckets)
+    }
+    if ($rawBuckets.Count -eq 0) {
+        return (New-ScoopStepResult -Status 'skipped' -Detail (msg 'summary.detail.bucket.none'))
+    }
+
+    $entries = [System.Collections.Generic.List[object]]::new()
+    foreach ($item in $rawBuckets) {
+        $resolved = Resolve-ScoopBucketEntry -Entry $item
+        if ($null -ne $resolved) { $entries.Add($resolved) }
+    }
+    if ($entries.Count -eq 0) {
+        return (New-ScoopStepResult -Status 'skipped' -Detail (msg 'summary.detail.bucket.none'))
+    }
+
+    $added = 0
+    $skipped = 0
+
+    foreach ($entry in $entries) {
+        $name = [string]$entry.Name
+        $url = [string]$entry.Url
+        $installed = (Get-WindotsBucketList).ContainsKey($name)
+
+        if ($installed) {
+            Write-Success (msg 'scoop.bucket.installed' $name)
+            $skipped++
+            continue
+        }
+
+        if ($WhatIf) {
+            if ($url) { Write-Plan "[WhatIf] scoop bucket add $name $url" }
+            else { Write-Plan "[WhatIf] scoop bucket add $name" }
+            $added++
+            continue
+        }
+
+        Write-Info (msg 'scoop.bucket.adding' $name)
+        if ($url) { & scoop bucket add $name $url 2>$null }
+        else { & scoop bucket add $name 2>$null }
+        $Global:WindotsBucketList = $null
+        $added++
+    }
+
+    if ($WhatIf) {
+        return (New-ScoopStepResult -Status 'ok' -Detail (msg 'summary.detail.whatif'))
+    }
+
+    if ($added -eq 0 -and $skipped -gt 0) {
+        return (New-ScoopStepResult -Status 'skipped' -Detail (msg 'summary.detail.bucket.skip'))
+    }
+    return (New-ScoopStepResult -Status 'ok' -Detail (msg 'summary.detail.bucket.ok' $added))
 }
 
 function Install-ScoopApp {

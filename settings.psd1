@@ -20,9 +20,20 @@
 
     # ------------------------------------------------------------------
     # Scoop
+    # MirrorUrl：国内镜像安装脚本
+    # GiteeRepo：镜像模式下 scoop config SCOOP_REPO 的目标地址
+    # Buckets：额外 bucket 列表（scoop 安装时默认仅含 main）
+    #   - 字符串：bucket 名称，如 'extras'（使用 scoop 默认源）
+    #   - 对象：@{ Name = 'mybucket'; Url = 'https://...' }
     # ------------------------------------------------------------------
     Scoop      = @{
         UseMirror = $true
+        MirrorUrl = 'https://gitee.com/scoop-installer/install/raw/master/install.ps1'
+        GiteeRepo = 'https://gitee.com/scoop-installer/scoop'
+        Buckets   = @(
+            'extras',
+            'nerd-fonts'
+        )
     }
 
     # ------------------------------------------------------------------
