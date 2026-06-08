@@ -24,6 +24,38 @@ function Remove-WindotsDirectoryContents {
     return $items.Count
 }
 
+function Remove-WindotsBackupExceptLatest {
+    param(
+        [Parameter(Mandatory)][string] $Path,
+        [switch]                       $WhatIf
+    )
+
+    $empty = @{ Removed = 0; Kept = $null }
+    if (-not (Test-Path $Path)) { return $empty }
+
+    $dirs = @(Get-ChildItem -LiteralPath $Path -Force -Directory -ErrorAction SilentlyContinue)
+    if ($dirs.Count -eq 0) { return $empty }
+
+    $sorted = $dirs | Sort-Object Name -Descending
+    $kept = $sorted[0]
+    $toRemove = @($sorted | Select-Object -Skip 1)
+    if ($toRemove.Count -eq 0) {
+        return @{ Removed = 0; Kept = $kept.Name }
+    }
+
+    if ($WhatIf) {
+        foreach ($item in $toRemove) {
+            Write-Plan "[WhatIf] Remove-Item -Recurse -Force '$($item.FullName)'"
+        }
+    }
+    else {
+        foreach ($item in $toRemove) {
+            Remove-Item -LiteralPath $item.FullName -Recurse -Force
+        }
+    }
+    return @{ Removed = $toRemove.Count; Kept = $kept.Name }
+}
+
 function Invoke-Clean {
     param(
         [Parameter(Mandatory)][pscustomobject] $Ctx,
@@ -44,13 +76,28 @@ function Invoke-Clean {
         Write-Info (msg 'clean.logs.empty')
     }
 
-    $backupRemoved = Remove-WindotsDirectoryContents -Path $backupDir -WhatIf:$Ctx.WhatIf
-    if ($backupRemoved -gt 0) {
-        if ($Ctx.WhatIf) { Write-Plan (msg 'clean.backup.done' $backupRemoved) }
-        else { Write-Success (msg 'clean.backup.done' $backupRemoved) }
+    if ($All) {
+        $backupRemoved = Remove-WindotsDirectoryContents -Path $backupDir -WhatIf:$Ctx.WhatIf
+        if ($backupRemoved -gt 0) {
+            if ($Ctx.WhatIf) { Write-Plan (msg 'clean.backup.done' $backupRemoved) }
+            else { Write-Success (msg 'clean.backup.done' $backupRemoved) }
+        }
+        else {
+            Write-Info (msg 'clean.backup.empty')
+        }
     }
     else {
-        Write-Info (msg 'clean.backup.empty')
+        $backupResult = Remove-WindotsBackupExceptLatest -Path $backupDir -WhatIf:$Ctx.WhatIf
+        if ($backupResult.Removed -gt 0) {
+            if ($Ctx.WhatIf) { Write-Plan (msg 'clean.backup.pruned' $backupResult.Removed $backupResult.Kept) }
+            else { Write-Success (msg 'clean.backup.pruned' $backupResult.Removed $backupResult.Kept) }
+        }
+        elseif ($backupResult.Kept) {
+            Write-Info (msg 'clean.backup.kept' $backupResult.Kept)
+        }
+        else {
+            Write-Info (msg 'clean.backup.empty')
+        }
     }
 
     if ($All) {

@@ -234,6 +234,8 @@
     'clean.logs.done'                    = '已清理 logs 目录 ({0} 项)'
     'clean.logs.empty'                   = 'logs 目录为空，跳过'
     'clean.backup.done'                  = '已清理 backup 目录 ({0} 项)'
+    'clean.backup.pruned'                = '已删除 {0} 份旧备份，保留最近一份：{1}'
+    'clean.backup.kept'                  = 'backup 仅有一份，已保留：{0}'
     'clean.backup.empty'                 = 'backup 目录为空，跳过'
     'clean.state.done'                   = '已删除 state：{0}'
     'clean.state.missing'                = 'state 文件不存在，跳过'

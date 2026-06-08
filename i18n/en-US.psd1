@@ -234,6 +234,8 @@
     'clean.logs.done'                    = 'Cleaned logs directory ({0} items)'
     'clean.logs.empty'                   = 'Logs directory is empty, skipping'
     'clean.backup.done'                  = 'Cleaned backup directory ({0} items)'
+    'clean.backup.pruned'                = 'Removed {0} old backup(s), kept latest: {1}'
+    'clean.backup.kept'                  = 'Only one backup found, kept: {0}'
     'clean.backup.empty'                 = 'Backup directory is empty, skipping'
     'clean.state.done'                   = 'Removed state: {0}'
     'clean.state.missing'                = 'State file not found, skipping'
