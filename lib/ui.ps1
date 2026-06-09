@@ -4,6 +4,59 @@
 
 # 丢弃启动阶段或输出期间误触的按键，避免 Read-Host / ReadKey 直接消费缓冲输入
 $script:WindotsConsoleInputFlush = $false
+$script:WindotsLastCtrlC = [DateTime]::MinValue
+$script:WindotsConsoleInputInit = $false
+
+function Initialize-WindotsConsoleInput {
+    if ($script:WindotsConsoleInputInit) { return }
+    $script:WindotsConsoleInputInit = $true
+    try { [Console]::TreatControlCAsInput = $true } catch { }
+    try {
+        $handler = [ConsoleCancelEventHandler]{
+            param($sender, $e)
+            $e.Cancel = $true
+            $now = [DateTime]::UtcNow
+            if (($now - $script:WindotsLastCtrlC).TotalMilliseconds -le 800) {
+                exit 130
+            }
+            $script:WindotsLastCtrlC = $now
+            [Console]::WriteLine('')
+            if (Get-Command -Name msg -ErrorAction SilentlyContinue) {
+                Write-Warn (msg 'ui.ctrlc.hint')
+            }
+        }
+        [Console]::add_CancelKeyPress($handler)
+    }
+    catch { }
+}
+
+function Test-CtrlCKey {
+    param($Key)
+    return ($Key.Key -eq 'C' -and (($Key.Modifiers -band [ConsoleModifiers]::Control) -ne 0))
+}
+
+function Invoke-CtrlCExitCheck {
+    $now = [DateTime]::UtcNow
+    if (($now - $script:WindotsLastCtrlC).TotalMilliseconds -le 800) {
+        exit 130
+    }
+    $script:WindotsLastCtrlC = $now
+    [Console]::WriteLine('')
+    Write-Warn (msg 'ui.ctrlc.hint')
+}
+
+function Read-MenuKey {
+    Initialize-WindotsConsoleInput
+    while ($true) {
+        $key = [Console]::ReadKey($true)
+        if (Test-CtrlCKey $key) {
+            Invoke-CtrlCExitCheck
+            continue
+        }
+        $script:WindotsLastCtrlC = [DateTime]::MinValue
+        return $key
+    }
+}
 
 function Clear-ConsoleInputBuffer {
     if (-not $script:WindotsConsoleInputFlush) {
@@ -404,7 +457,7 @@ function Select-Items {
             Write-Host (msg 'ui.select.scroll.down' $below) -ForegroundColor DarkGray
         }
 
-        $key = [Console]::ReadKey($true)
+        $key = Read-MenuKey
         $shift = ($key.Modifiers -band [ConsoleModifiers]::Shift) -ne 0
         switch ($key.Key) {
             { $_ -in @('UpArrow', 'K') } { $cursor = ($cursor - 1 + $Items.Count) % $Items.Count }
@@ -480,7 +533,7 @@ function Select-One {
             $color = if ($i -eq $cursor) { [ConsoleColor]::Cyan } else { [ConsoleColor]::Gray }
             Write-Host ("$arrow $label") -ForegroundColor $color
         }
-        $key = [Console]::ReadKey($true)
+        $key = Read-MenuKey
         switch ($key.Key) {
             { $_ -in @('UpArrow', 'K') } { $cursor = ($cursor - 1 + $Items.Count) % $Items.Count }
             { $_ -in @('DownArrow', 'J') } { $cursor = ($cursor + 1) % $Items.Count }
@@ -488,6 +541,8 @@ function Select-One {
         }
     }
 }
+
+Initialize-WindotsConsoleInput
 
 function Pad-DisplayTextRaw {
     param(

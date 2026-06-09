@@ -14,6 +14,7 @@
     # --- Interactive UI ---
     'ui.empty'                           = '{0}: no items available, skipping'
     'ui.select.hint'                     = '  Up/Down Move  Space Toggle  A Select All  N Deselect All  Enter Confirm  Esc Cancel'
+    'ui.ctrlc.hint'                      = 'Press Ctrl+C again to exit'
     'ui.select.scroll.up'                = '  ↑ {0} more above'
     'ui.select.scroll.down'              = '  ↓ {0} more below'
     'ui.select.installed'                = '[installed]'

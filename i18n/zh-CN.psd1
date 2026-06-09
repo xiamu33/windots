@@ -14,6 +14,7 @@
     # --- 交互 UI ---
     'ui.empty'                           = '{0} : 无可选项，跳过'
     'ui.select.hint'                     = '  ↑/↓ 移动  空格 切换  A 全选  N 全不选  Enter 确认  Esc 取消'
+    'ui.ctrlc.hint'                      = '再次按 Ctrl+C 退出'
     'ui.select.scroll.up'                = '  ↑ 还有 {0} 项'
     'ui.select.scroll.down'              = '  ↓ 还有 {0} 项'
     'ui.select.installed'                = '[已安装]'

@@ -178,7 +178,7 @@ function Resolve-LinkMode {
 
     Clear-ConsoleInputBuffer
     while ($true) {
-        $key = [Console]::ReadKey($true)
+        $key = Read-MenuKey
         if ($key.Key -eq 'R' -or $key.KeyChar -eq 'r') {
             if (Test-DeveloperMode) {
                 Write-Success (msg 'links.symlink.devmode.ok')
