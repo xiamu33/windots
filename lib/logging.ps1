@@ -72,6 +72,7 @@ function Invoke-CapturedPwshCommand {
     $psi = New-Object System.Diagnostics.ProcessStartInfo
     $psi.FileName = (Get-Command pwsh -ErrorAction Stop).Source
     [void]$psi.ArgumentList.Add('-NoProfile')
+    [void]$psi.ArgumentList.Add('-NonInteractive')
     [void]$psi.ArgumentList.Add('-Command')
     [void]$psi.ArgumentList.Add("$Command; exit `$LASTEXITCODE")
     $psi.RedirectStandardOutput = $true
