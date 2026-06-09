@@ -14,6 +14,8 @@
     # --- Interactive UI ---
     'ui.empty'                           = '{0}: no items available, skipping'
     'ui.select.hint'                     = '  Up/Down Move  Space Toggle  A Select All  N Deselect All  Enter Confirm  Esc Cancel'
+    'ui.select.scroll.up'                = '  ↑ {0} more above'
+    'ui.select.scroll.down'              = '  ↓ {0} more below'
     'ui.select.installed'                = '[installed]'
     'ui.select.not.installed'            = '[not installed]'
     'ui.select.unsupported'              = '[unsupported]'

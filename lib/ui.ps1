@@ -87,6 +87,47 @@ function Get-DisplayWidth {
     return $width
 }
 
+function Get-ConsoleHeight {
+    param([int] $MinHeight = 24)
+    $h = 0
+    try {
+        if ($IsWindows -or $env:OS -eq 'Windows_NT') {
+            try { $h = [int][Console]::WindowHeight } catch { }
+        }
+    }
+    catch { }
+    if ($h -le 0) {
+        try {
+            if ($Host.UI -and $Host.UI.RawUI) {
+                $h = [int]$Host.UI.RawUI.WindowSize.Height
+            }
+        }
+        catch { }
+    }
+    if ($h -le 0 -and $env:LINES) {
+        try { $h = [int]$env:LINES } catch { }
+    }
+    if ($h -le 0) { return $MinHeight }
+    return $h
+}
+
+function Clear-ConsoleViewport {
+    param([int] $Lines)
+    if ($Lines -le 0) { return }
+    try {
+        $w = [Math]::Max(1, [Console]::WindowWidth)
+        $blank = ' ' * $w
+        for ($y = 0; $y -lt $Lines; $y++) {
+            [Console]::SetCursorPosition(0, $y)
+            [Console]::Write($blank)
+        }
+        [Console]::SetCursorPosition(0, 0)
+    }
+    catch {
+        Clear-Host
+    }
+}
+
 # 多选菜单（↑↓/J/K 移动, 空格切换, A全选, N全不选, Enter确认, Esc取消）
 # -Grouped：分组树模式（D/U 跳组, A/N 当前组, Shift+A/N 全局）
 function Select-Items {
@@ -223,8 +264,42 @@ function Select-Items {
         return $indices[$next]
     }
 
+    $jumpGroupUp = {
+        param([int] $From)
+        if (& $isGroupRow $Items[$From]) {
+            return & $jumpGroup -1 $From
+        }
+        $gi = [int]$Items[$From].GroupIdx
+        if ($gi -lt 0) { return $From }
+        for ($i = 0; $i -lt $Items.Count; $i++) {
+            if ((& $isGroupRow $Items[$i]) -and ([int]$Items[$i].GroupIdx -eq $gi)) {
+                return $i
+            }
+        }
+        return $From
+    }
+
+    $scrollTop = 0
+    $firstDraw = $true
+
     while ($true) {
-        Clear-Host
+        $consoleH = Get-ConsoleHeight
+        $listAvail = [Math]::Max(1, $consoleH - 3)
+        $needScroll = $Items.Count -gt $listAvail
+        $viewRows = if ($needScroll) { [Math]::Max(1, $listAvail - 2) } else { $Items.Count }
+        $maxScroll = [Math]::Max(0, $Items.Count - $viewRows)
+        # 光标上方预览约视口高度 1/3，至少 1 项（视口过窄时不强制）
+        $scrollMargin = 0
+        if ($viewRows -gt 1) {
+            $scrollMargin = [Math]::Max(1, [Math]::Floor($viewRows / 3))
+            $scrollMargin = [Math]::Min($scrollMargin, $viewRows - 1)
+        }
+        $idealTop = $cursor - $scrollMargin
+        $scrollTop = [Math]::Max(0, [Math]::Min($idealTop, $maxScroll))
+
+        if ($firstDraw) { Clear-Host; $firstDraw = $false }
+        else { Clear-ConsoleViewport -Lines $consoleH }
+
         Write-Host $Title -ForegroundColor Magenta
         Write-Host $hint  -ForegroundColor DarkGray
         Write-Host ''
@@ -250,7 +325,12 @@ function Select-Items {
         if ($installedTagBaseWidth -gt 0) { $installedTagBaseWidth += 2 }
         $tagBaseWidth = [Math]::Max($installedTagBaseWidth, $notInstalledTagWidth + 2)
 
-        for ($i = 0; $i -lt $Items.Count; $i++) {
+        if ($needScroll -and $scrollTop -gt 0) {
+            Write-Host (msg 'ui.select.scroll.up' $scrollTop) -ForegroundColor DarkGray
+        }
+
+        $viewEnd = [Math]::Min($scrollTop + $viewRows, $Items.Count)
+        for ($i = $scrollTop; $i -lt $viewEnd; $i++) {
             $label = & $Labeler $Items[$i]
             $sfx = if ($SuffixLabeler -and (& $isPkgRow $Items[$i])) { [string](& $SuffixLabeler $Items[$i]) } else { '' }
             $prefix = if ($Grouped -and $Items[$i].Depth -gt 0) { '  ' * [int]$Items[$i].Depth } else { '' }
@@ -319,13 +399,18 @@ function Select-Items {
             }
         }
 
+        if ($needScroll -and ($scrollTop + $viewRows) -lt $Items.Count) {
+            $below = $Items.Count - $scrollTop - $viewRows
+            Write-Host (msg 'ui.select.scroll.down' $below) -ForegroundColor DarkGray
+        }
+
         $key = [Console]::ReadKey($true)
         $shift = ($key.Modifiers -band [ConsoleModifiers]::Shift) -ne 0
         switch ($key.Key) {
             { $_ -in @('UpArrow', 'K') } { $cursor = ($cursor - 1 + $Items.Count) % $Items.Count }
             { $_ -in @('DownArrow', 'J') } { $cursor = ($cursor + 1) % $Items.Count }
             'D' { if ($Grouped) { $cursor = & $jumpGroup 1 $cursor } }
-            'U' { if ($Grouped) { $cursor = & $jumpGroup -1 $cursor } }
+            'U' { if ($Grouped) { $cursor = & $jumpGroupUp $cursor } }
             'Spacebar' {
                 if (& $isGroupRow $Items[$cursor]) {
                     $mark = & $getRowMark $cursor
