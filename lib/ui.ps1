@@ -87,7 +87,8 @@ function Get-DisplayWidth {
     return $width
 }
 
-# 多选菜单（↑↓移动, 空格切换, A全选, N全不选, Enter确认, Esc取消）
+# 多选菜单（↑↓/J/K 移动, 空格切换, A全选, N全不选, Enter确认, Esc取消）
+# -Grouped：分组树模式（D/U 跳组, A/N 当前组, Shift+A/N 全局）
 function Select-Items {
     param(
         [Parameter(Mandatory)][string]   $Title,
@@ -98,15 +99,21 @@ function Select-Items {
         [string[]]    $Disabled = @(),
         [string[]]    $NotInstalled = @(),
         [string[]]    $Installed = @(),
-        [string[]]    $Locked = @()
+        [string[]]    $Locked = @(),
+        [switch]      $Grouped,
+        [string]      $HintKey = 'ui.select.hint'
     )
     $Items = @($Items | Where-Object { $null -ne $_ })
     if ($Items.Count -eq 0) { Write-Warn (msg 'ui.empty' $Title); return @() }
 
     Clear-ConsoleInputBuffer
 
+    $isGroupRow = { param($row) $Grouped -and $row.Kind -eq 'group' }
+    $isPkgRow = { param($row) -not $Grouped -or $row.Kind -eq 'package' }
+
     $selected = New-Object 'bool[]' $Items.Count
     for ($i = 0; $i -lt $Items.Count; $i++) {
+        if (& $isGroupRow $Items[$i]) { $selected[$i] = $false; continue }
         $lbl = & $Labeler $Items[$i]
         $selected[$i] = if ($Locked -contains $lbl) { $true }
         elseif ($Disabled -contains $lbl -or $NotInstalled -contains $lbl) { $false }
@@ -117,7 +124,104 @@ function Select-Items {
     $installedTag = msg 'ui.select.installed'
     $notInstalledTag = msg 'ui.select.not.installed'
     $unsupportedTag = msg 'ui.select.unsupported'
-    $hint = msg 'ui.select.hint'
+    $hint = msg $HintKey
+
+    $getRowMark = {
+        param([int] $Idx)
+        if (& $isGroupRow $Items[$Idx]) {
+            $indices = @($Items[$Idx].PackageIndices)
+            $sel = 0; $total = 0
+            foreach ($pi in $indices) {
+                $lbl = & $Labeler $Items[$pi]
+                if ($Disabled -contains $lbl -or $NotInstalled -contains $lbl) { continue }
+                $total++
+                if ($selected[$pi]) { $sel++ }
+            }
+            if ($total -eq 0 -or $sel -eq 0) { return ' ' }
+            if ($sel -eq $total) { return 'x' }
+            return '-'
+        }
+        if ($selected[$Idx]) { return 'x' }
+        return ' '
+    }
+
+    $rowSelectable = {
+        param([int] $Idx)
+        if (& $isGroupRow $Items[$Idx]) { return $true }
+        $lbl = & $Labeler $Items[$Idx]
+        return $Disabled -notcontains $lbl -and $NotInstalled -notcontains $lbl -and $Locked -notcontains $lbl
+    }
+
+    $currentGroupIdx = {
+        $row = $Items[$cursor]
+        if (& $isGroupRow $row) { return [int]$row.GroupIdx }
+        if ($Grouped) { return [int]$row.GroupIdx }
+        return -1
+    }
+
+    $setGroupSubtree = {
+        param([int] $GroupRowIdx, [bool] $Value)
+        foreach ($pi in @($Items[$GroupRowIdx].PackageIndices)) {
+            $lbl = & $Labeler $Items[$pi]
+            if ($Value) {
+                if ($Disabled -notcontains $lbl -and $NotInstalled -notcontains $lbl -and $Locked -notcontains $lbl) {
+                    $selected[$pi] = $true
+                }
+            }
+            elseif ($Locked -notcontains $lbl) {
+                $selected[$pi] = $false
+            }
+        }
+    }
+
+    $setByGroupIdx = {
+        param([int] $Gi, [bool] $Value)
+        for ($i = 0; $i -lt $Items.Count; $i++) {
+            if (-not (& $isPkgRow $Items[$i])) { continue }
+            if ([int]$Items[$i].GroupIdx -ne $Gi) { continue }
+            $lbl = & $Labeler $Items[$i]
+            if ($Value) {
+                if ($Disabled -notcontains $lbl -and $NotInstalled -notcontains $lbl -and $Locked -notcontains $lbl) {
+                    $selected[$i] = $true
+                }
+            }
+            elseif ($Locked -notcontains $lbl) {
+                $selected[$i] = $false
+            }
+        }
+    }
+
+    $setAllPackages = {
+        param([bool] $Value)
+        for ($i = 0; $i -lt $Items.Count; $i++) {
+            if (-not (& $isPkgRow $Items[$i])) { continue }
+            $lbl = & $Labeler $Items[$i]
+            if ($Value) {
+                if ($Disabled -notcontains $lbl -and $NotInstalled -notcontains $lbl -and $Locked -notcontains $lbl) {
+                    $selected[$i] = $true
+                }
+            }
+            elseif ($Locked -notcontains $lbl) {
+                $selected[$i] = $false
+            }
+        }
+    }
+
+    $jumpGroup = {
+        param([int] $Dir, [int] $From)
+        $indices = [System.Collections.Generic.List[int]]::new()
+        for ($i = 0; $i -lt $Items.Count; $i++) {
+            if (& $isGroupRow $Items[$i]) { [void]$indices.Add($i) }
+        }
+        if ($indices.Count -eq 0) { return $From }
+        $pos = 0
+        for ($j = 0; $j -lt $indices.Count; $j++) {
+            if ($indices[$j] -eq $From) { $pos = $j; break }
+            if ($indices[$j] -lt $From) { $pos = $j }
+        }
+        $next = ($pos + $Dir + $indices.Count) % $indices.Count
+        return $indices[$next]
+    }
 
     while ($true) {
         Clear-Host
@@ -128,6 +232,7 @@ function Select-Items {
         $installedTagBaseWidth = 0
         $notInstalledTagWidth = Get-DisplayWidth $notInstalledTag
         for ($i = 0; $i -lt $Items.Count; $i++) {
+            if (& $isGroupRow $Items[$i]) { continue }
             $label = & $Labeler $Items[$i]
             $sfx = if ($SuffixLabeler) { [string](& $SuffixLabeler $Items[$i]) } else { '' }
             if ($Disabled -contains $label) { continue }
@@ -138,7 +243,7 @@ function Select-Items {
                 continue
             }
             $arrow = if ($i -eq $cursor) { '>' } else { ' ' }
-            $mark = if ($selected[$i]) { 'x' } else { ' ' }
+            $mark = & $getRowMark $i
             $w = Get-DisplayWidth ("$arrow [$mark] $label$sfx")
             if ($w -gt $installedTagBaseWidth) { $installedTagBaseWidth = $w }
         }
@@ -147,19 +252,26 @@ function Select-Items {
 
         for ($i = 0; $i -lt $Items.Count; $i++) {
             $label = & $Labeler $Items[$i]
-            $sfx = if ($SuffixLabeler) { [string](& $SuffixLabeler $Items[$i]) } else { '' }
+            $sfx = if ($SuffixLabeler -and (& $isPkgRow $Items[$i])) { [string](& $SuffixLabeler $Items[$i]) } else { '' }
+            $prefix = if ($Grouped -and $Items[$i].Depth -gt 0) { '  ' * [int]$Items[$i].Depth } else { '' }
             $isDisabled = $Disabled -contains $label
             $isNotInstalled = $NotInstalled -contains $label
             $isInstalled = $Installed -contains $label
             $isLocked = $Locked -contains $label
-            $mark = if ($selected[$i]) { 'x' } else { ' ' }
+            $mark = & $getRowMark $i
             $arrow = if ($i -eq $cursor) { '>' } else { ' ' }
 
+            if (& $isGroupRow $Items[$i]) {
+                $color = if ($i -eq $cursor) { [ConsoleColor]::Cyan } else { [ConsoleColor]::Yellow }
+                Write-Host ("$prefix$arrow [$mark] $label") -ForegroundColor $color
+                continue
+            }
+
             if ($isDisabled) {
-                Write-Host ("  [ ] $label  $unsupportedTag") -ForegroundColor DarkGray
+                Write-Host ("$prefix  [ ] $label  $unsupportedTag") -ForegroundColor DarkGray
             }
             elseif ($isNotInstalled) {
-                $lineText = "$arrow [ ] $label$sfx"
+                $lineText = "$prefix$arrow [ ] $label$sfx"
                 $lineWidth = Get-DisplayWidth $lineText
                 if ($tagBaseWidth -gt 0) {
                     Write-Host -NoNewline ($lineText + (' ' * [Math]::Max(0, ($tagBaseWidth - $lineWidth)))) -ForegroundColor DarkGray
@@ -171,7 +283,7 @@ function Select-Items {
                 Write-Host $notInstalledTag -ForegroundColor DarkGray
             }
             elseif ($isLocked) {
-                $lockedText = "$arrow [x] $label$sfx"
+                $lockedText = "$prefix$arrow [x] $label$sfx"
                 $lockedWidth = Get-DisplayWidth $lockedText
                 if ($tagBaseWidth -gt 0) {
                     Write-Host -NoNewline ($lockedText + (' ' * [Math]::Max(0, ($tagBaseWidth - $lockedWidth)))) -ForegroundColor DarkGray
@@ -186,7 +298,7 @@ function Select-Items {
                 $color = if ($i -eq $cursor) { [ConsoleColor]::Cyan }
                 elseif ($selected[$i]) { [ConsoleColor]::Green }
                 else { [ConsoleColor]::Gray }
-                $lineText = "$arrow [$mark] $label$sfx"
+                $lineText = "$prefix$arrow [$mark] $label$sfx"
                 $lineWidth = Get-DisplayWidth $lineText
                 if ($tagBaseWidth -gt 0) {
                     Write-Host -NoNewline ($lineText + (' ' * [Math]::Max(0, ($tagBaseWidth - $lineWidth)))) -ForegroundColor $color
@@ -201,40 +313,57 @@ function Select-Items {
                 $color = if ($i -eq $cursor) { [ConsoleColor]::Cyan }
                 elseif ($selected[$i]) { [ConsoleColor]::Green }
                 else { [ConsoleColor]::Gray }
-                Write-Host -NoNewline ("$arrow [$mark] $label") -ForegroundColor $color
+                Write-Host -NoNewline ("$prefix$arrow [$mark] $label") -ForegroundColor $color
                 if ($sfx) { Write-Host $sfx -ForegroundColor DarkCyan }
                 else { Write-Host '' }
             }
         }
 
         $key = [Console]::ReadKey($true)
+        $shift = ($key.Modifiers -band [ConsoleModifiers]::Shift) -ne 0
         switch ($key.Key) {
             { $_ -in @('UpArrow', 'K') } { $cursor = ($cursor - 1 + $Items.Count) % $Items.Count }
             { $_ -in @('DownArrow', 'J') } { $cursor = ($cursor + 1) % $Items.Count }
+            'D' { if ($Grouped) { $cursor = & $jumpGroup 1 $cursor } }
+            'U' { if ($Grouped) { $cursor = & $jumpGroup -1 $cursor } }
             'Spacebar' {
-                $lbl = & $Labeler $Items[$cursor]
-                if ($Disabled -notcontains $lbl -and $NotInstalled -notcontains $lbl -and $Locked -notcontains $lbl) {
+                if (& $isGroupRow $Items[$cursor]) {
+                    $mark = & $getRowMark $cursor
+                    & $setGroupSubtree $cursor ($mark -ne 'x')
+                }
+                elseif (& $rowSelectable $cursor) {
                     $selected[$cursor] = -not $selected[$cursor]
                 }
             }
             'A' {
-                for ($i = 0; $i -lt $Items.Count; $i++) {
-                    $lbl = & $Labeler $Items[$i]
-                    if ($Disabled -notcontains $lbl -and $NotInstalled -notcontains $lbl -and $Locked -notcontains $lbl) { $selected[$i] = $true }
+                if ($shift) { & $setAllPackages $true }
+                elseif ($Grouped) { & $setByGroupIdx (& $currentGroupIdx) $true }
+                else {
+                    for ($i = 0; $i -lt $Items.Count; $i++) {
+                        if (& $rowSelectable $i) { $selected[$i] = $true }
+                    }
                 }
             }
             'N' {
-                for ($i = 0; $i -lt $Items.Count; $i++) {
-                    $lbl = & $Labeler $Items[$i]
-                    if ($Locked -notcontains $lbl) { $selected[$i] = $false }
+                if ($shift) { & $setAllPackages $false }
+                elseif ($Grouped) { & $setByGroupIdx (& $currentGroupIdx) $false }
+                else {
+                    for ($i = 0; $i -lt $Items.Count; $i++) {
+                        $lbl = & $Labeler $Items[$i]
+                        if ($Locked -notcontains $lbl) { $selected[$i] = $false }
+                    }
                 }
             }
             'Enter' {
-                $result = @()
+                $result = [System.Collections.Generic.List[object]]::new()
                 for ($i = 0; $i -lt $Items.Count; $i++) {
-                    if ($selected[$i]) { $result += , $Items[$i] }
+                    if (-not $selected[$i]) { continue }
+                    if ($Grouped) {
+                        if ($Items[$i].Kind -eq 'package') { [void]$result.Add($Items[$i].Package) }
+                    }
+                    else { [void]$result.Add($Items[$i]) }
                 }
-                return $result
+                return @($result)
             }
             'Escape' { return @() }
         }
@@ -713,37 +842,33 @@ function Write-PackageList {
 
     $resolvedScoop = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
     $tableRows = [System.Collections.Generic.List[string[]]]::new()
-    $seq = 1
-
-    $groups = @(
-        @{ TitleKey = 'ui.packages.group.rec'; Items = @($PackagesDef.Recommended) }
-        @{ TitleKey = 'ui.packages.group.dev'; Items = @($PackagesDef.Optional.Dev) }
-        @{ TitleKey = 'ui.packages.group.term'; Items = @($PackagesDef.Optional.Term) }
-        @{ TitleKey = 'ui.packages.group.beauty'; Items = @($PackagesDef.Optional.Beauty) }
-    )
-
-    foreach ($group in $groups) {
-        $groupItems = @($group.Items | Where-Object { $selectedSet.Contains([string]$_.Name) })
-        foreach ($item in $groupItems) {
-            $name = [string]$item.Name
-            $desc = Get-PackageDesc -Package $item
-            $deps = ''
-            if ($item.Contains('Packages') -and $null -ne $item.Packages) {
-                $pkgNames = @($item.Packages | ForEach-Object { [string]$_ })
-                foreach ($p in $pkgNames) { [void]$resolvedScoop.Add($p) }
-                $extraPkgs = @($pkgNames | Where-Object {
-                        (Get-ScoopAppBaseName -Name $_) -ine $name
-                    })
-                if ($extraPkgs.Count -gt 0) {
-                    $deps = @($extraPkgs | ForEach-Object { Get-ScoopAppBaseName -Name $_ }) -join ', '
-                }
-            }
-            else {
-                [void]$resolvedScoop.Add($name)
-            }
-            [void]$tableRows.Add(@([string]$seq, $name, $desc, $deps))
-            $seq++
+    $orderedItems = [System.Collections.Generic.List[object]]::new()
+    Invoke-PackageTreeWalk -Nodes @($PackagesDef.Packages) -Visitor {
+        param($Kind, $Node, $GroupDefaults)
+        if ($Kind -eq 'package' -and $selectedSet.Contains([string]$Node.Name)) {
+            [void]$orderedItems.Add($Node)
         }
+    }
+    $seq = 1
+    foreach ($item in $orderedItems) {
+        $name = [string]$item.Name
+        $desc = Get-PackageDesc -Package $item
+        $deps = ''
+        if ($item.Contains('Packages') -and $null -ne $item.Packages) {
+            $pkgNames = @($item.Packages | ForEach-Object { [string]$_ })
+            foreach ($p in $pkgNames) { [void]$resolvedScoop.Add($p) }
+            $extraPkgs = @($pkgNames | Where-Object {
+                    (Get-ScoopAppBaseName -Name $_) -ine $name
+                })
+            if ($extraPkgs.Count -gt 0) {
+                $deps = @($extraPkgs | ForEach-Object { Get-ScoopAppBaseName -Name $_ }) -join ', '
+            }
+        }
+        else {
+            [void]$resolvedScoop.Add($name)
+        }
+        [void]$tableRows.Add(@([string]$seq, $name, $desc, $deps))
+        $seq++
     }
 
     $extras = @($scoopList | Where-Object { -not $resolvedScoop.Contains([string]$_) })

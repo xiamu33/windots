@@ -2,6 +2,49 @@
 # Windots 包选择与安装共享逻辑 (lib/packages-apply.ps1)
 # =====================================================================
 
+function Invoke-PackageTreeWalk {
+    param(
+        [Parameter(Mandatory)]            $Nodes,
+        [object[]]                        $GroupDefaults = @(),
+        [Parameter(Mandatory)][scriptblock] $Visitor
+    )
+    foreach ($node in @($Nodes | Where-Object { $null -ne $_ })) {
+        if ($node.Contains('Items') -and $null -ne $node.Items) {
+            $gd = @($GroupDefaults)
+            if ($node.Contains('Default')) { $gd = @($GroupDefaults + @($node)) }
+            & $Visitor 'group' $node $gd
+            Invoke-PackageTreeWalk -Nodes $node.Items -GroupDefaults $gd -Visitor $Visitor
+        }
+        elseif ($node.Contains('Name')) {
+            & $Visitor 'package' $node $GroupDefaults
+        }
+    }
+}
+
+function Get-ResolvedPackageDefault {
+    param(
+        [Parameter(Mandatory)] $Node,
+        [object[]]             $GroupDefaults = @()
+    )
+    if ($Node.Contains('Default')) { return [bool]$Node.Default }
+    for ($i = $GroupDefaults.Count - 1; $i -ge 0; $i--) {
+        $g = $GroupDefaults[$i]
+        if ($g.Contains('Default')) { return [bool]$g.Default }
+    }
+    return $false
+}
+
+function Get-AllPackageItems {
+    param([Parameter(Mandatory)][hashtable] $PackagesDef)
+
+    $items = [System.Collections.Generic.List[object]]::new()
+    Invoke-PackageTreeWalk -Nodes @($PackagesDef.Packages) -Visitor {
+        param($Kind, $Node, $GroupDefaults)
+        if ($Kind -eq 'package') { [void]$items.Add($Node) }
+    }
+    return @($items)
+}
+
 function Get-SelectedPackageItems {
     param(
         [Parameter(Mandatory)]                 $State,
@@ -14,9 +57,12 @@ function Get-SelectedPackageItems {
     else {
         $State.Scoop_Apps
     }
-    $allItems = @()
-    foreach ($s in @($PackagesDef.Recommended) + @($PackagesDef.Optional.Dev) + @($PackagesDef.Optional.Term) + @($PackagesDef.Optional.Beauty)) {
-        if ($pkgLookup -contains $s.Name) { $allItems += $s }
+    $allItems = [System.Collections.Generic.List[object]]::new()
+    Invoke-PackageTreeWalk -Nodes @($PackagesDef.Packages) -Visitor {
+        param($Kind, $Node, $GroupDefaults)
+        if ($Kind -eq 'package' -and $pkgLookup -contains [string]$Node.Name) {
+            [void]$allItems.Add($Node)
+        }
     }
     return @($allItems)
 }
@@ -28,14 +74,6 @@ function Get-PackageItemScoopApps {
         return @($PackageItem.Packages | ForEach-Object { [string]$_ })
     }
     return @([string]$PackageItem.Name)
-}
-
-function Get-AllPackageItems {
-    param([Parameter(Mandatory)][hashtable] $PackagesDef)
-
-    return @(
-        @($PackagesDef.Recommended) + @($PackagesDef.Optional.Dev) + @($PackagesDef.Optional.Term) + @($PackagesDef.Optional.Beauty)
-    )
 }
 
 function Get-ScoopAppsForPackageNames {

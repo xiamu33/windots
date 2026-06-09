@@ -3,29 +3,24 @@
 #
 # 结构说明：
 #   PackageManagers  - 包管理器选择（多选）
-#   Recommended      - 推荐安装（默认全选）
-#   Optional.Dev     - 可选：开发环境
-#   Optional.Term    - 可选：终端工具
-#   Optional.Beauty  - 可选：美化工具
+#   Packages         - 安装包树（分组与包可任意嵌套、混排）
 #   Extras           - 全局配置（不属于具体工具，如 PowerShell Profile）
 #
-# 每个工具项字段：
+# 分组节点：
+#   Title    - 组名或 i18n 键（优先查语言包，无则原样显示）
+#   Items    - 子节点（分组或包）
+#   Default  - 可选；子树内未声明 Default 的包继承此值
+#
+# 包节点：
 #   Name     - 菜单标识名（必填）
-#   Desc     - 可选；包描述，交互菜单中显示在名称后
-#              字符串：任意语言下均使用该描述
-#              对象：当前语言 Desc > i18n 当前语言 > 默认语言 Desc > i18n 默认语言
-#              示例：
-#                Desc = 'Universal description'
-#                Desc = @{ 'zh-CN' = '中文描述'; 'en-US' = 'English description' }
-#              未配置 Desc 时，直接使用 i18n/pkg.<Name>.desc
-#   Default  - 菜单中是否默认勾选（必填）
-#   Packages - 可选；实际 scoop 安装名，配置后忽略 Name 作为安装名
-#              支持字符串（单包）或数组（主包 + 依赖包）
-#   Dotfiles - 可选；配置联动；null 表示无配置
-#              @{ Src='dotfiles/...'; Dest='系统目标路径' }
+#   Desc     - 可选；包描述（字符串或 @{ 'zh-CN'='...'; 'en-US'='...' }）
+#              未配置时使用 i18n/pkg.<Name>.desc
+#   Default  - 可选；覆盖分组 Default
+#   Packages - 可选；实际 scoop 安装名（字符串或数组）
+#   Dotfiles - 可选；@{ Src='...'; Dest='...' } 或数组
 #
 # 重要：
-#   - Dest 路径写成字符串字面量（不含 $HOME/$env），由脚本在运行时展开
+#   - Dest 路径写成字符串字面量，由脚本在运行时展开
 #   - 此文件只允许字面量，不允许表达式（psd1 格式限制）
 # =====================================================================
 @{
@@ -34,82 +29,85 @@
         @{ Key = 'winget'; Name = 'Winget'; Default = $false; Supported = $false }
     )
 
-    Recommended     = @(
-        @{ Name = 'curl'; Default = $true }
-        @{ Name = 'fd'; Default = $true }
-        @{ Name = 'sudo'; Default = $true }
-        @{ Name = 'aria2'; Default = $false }
-        @{ Name = 'bat'; Default = $true }
-        @{ Name = 'delta'; Default = $true }
-        @{ Name = 'eza'; Default = $true }
-        @{ Name = 'lsd'; Default = $false }
-        @{ Name = 'fzf'; Default = $true }
-        @{ Name = 'jd'; Default = $true }
-        @{ Name = 'jq'; Default = $true }
-        @{ Name = 'ripgrep'; Default = $true }
-        @{ Name = 'tldr'; Default = $true }
-        @{ Name = 'zoxide'; Default = $true }
+    Packages        = @(
+        @{
+            Title   = 'ui.packages.group.rec'
+            Default = $true
+            Items   = @(
+                @{ Name = 'curl' }
+                @{ Name = 'fd' }
+                @{ Name = 'sudo' }
+                @{ Name = 'aria2'; Default = $false }
+                @{ Name = 'bat' }
+                @{ Name = 'delta' }
+                @{ Name = 'eza' }
+                @{ Name = 'lsd'; Default = $false }
+                @{ Name = 'fzf' }
+                @{ Name = 'jd' }
+                @{ Name = 'jq' }
+                @{ Name = 'ripgrep' }
+                @{ Name = 'tldr'; Default = $false }
+                @{ Name = 'zoxide' }
+            )
+        }
+        @{
+            Title   = 'ui.packages.group.dev'
+            Default = $false
+            Items   = @(
+                @{
+                    Name     = 'mise'
+                    Packages = @('mise', 'extras/vcredist2022')
+                }
+                @{ Name = 'fnm' }
+                @{ Name = 'pnpm' }
+                @{ Name = 'rust' }
+            )
+        }
+        @{
+            Title   = 'ui.packages.group.term'
+            Default = $false
+            Items   = @(
+                @{ Name = 'lazygit' }
+                @{ Name = 'neovim' }
+                @{
+                    Name     = 'yazi'
+                    Packages = @('yazi', 'ffmpeg', '7zip', 'jq', 'poppler', 'fd', 'ripgrep', 'fzf', 'zoxide', 'resvg', 'imagemagick')
+                }
+                @{ Name = 'zellij' }
+            )
+        }
+        @{
+            Title   = 'ui.packages.group.beauty'
+            Default = $false
+            Items   = @(
+                @{ Name = 'starship' }
+                @{
+                    Name     = 'glazewm'
+                    Dotfiles = @{ Src = 'dotfiles/glazewm/config.yaml'; Dest = 'HOME\.glzr\glazewm\config.yaml' }
+                }
+                @{
+                    Name     = 'zebar'
+                    Dotfiles = @{ Src = 'dotfiles/zebar/settings.json'; Dest = 'HOME\.glzr\zebar\settings.json' }
+                }
+                @{
+                    Name     = 'yasb'
+                    Dotfiles = @(
+                        @{ Src = 'dotfiles/yasb/config.yaml'; Dest = 'HOME\.config\yasb\config.yaml' }
+                        @{ Src = 'dotfiles/yasb/styles.css'; Dest = 'HOME\.config\yasb\styles.css' }
+                    )
+                }
+                @{
+                    Name     = 'flow-launcher'
+                    Packages = 'extras/Flow-Launcher'
+                }
+            )
+        }
     )
-
-    Optional        = @{
-        Dev    = @(
-            @{
-                Name     = 'mise'
-                Default  = $false
-                Packages = @('mise', 'extras/vcredist2022')
-            }
-            @{ Name = 'fnm'; Default = $false }
-            @{ Name = 'pnpm'; Default = $false }
-            @{ Name = 'rust'; Default = $false }
-        )
-
-        Term   = @(
-            @{ Name = 'lazygit'; Default = $false }
-            @{ Name = 'neovim'; Default = $false }
-            @{
-                Name     = 'yazi'
-                Default  = $false
-                Packages = @('yazi', 'ffmpeg', '7zip', 'jq', 'poppler', 'fd', 'ripgrep', 'fzf', 'zoxide', 'resvg', 'imagemagick')
-            }
-            @{ Name = 'zellij'; Default = $false }
-        )
-
-        Beauty = @(
-            @{ Name = 'starship'; Default = $false }
-            @{
-                Name     = 'glazewm'
-                Default  = $false
-                Dotfiles = @{ Src = 'dotfiles/glazewm/config.yaml'; Dest = 'HOME\.glzr\glazewm\config.yaml' }
-            }
-            @{
-                Name     = 'zebar'
-                Default  = $false
-                Dotfiles = @{ Src = 'dotfiles/zebar/settings.json'; Dest = 'HOME\.glzr\zebar\settings.json' }
-            }
-            @{
-                Name     = 'yasb'
-                Default  = $false
-                Dotfiles = @(
-                    @{ Src = 'dotfiles/yasb/config.yaml'; Dest = 'HOME\.config\yasb\config.yaml' }
-                    @{ Src = 'dotfiles/yasb/styles.css'; Dest = 'HOME\.config\yasb\styles.css' }
-                )
-            }
-            @{ 
-                Name     = 'flow-launcher'
-                Default  = $false
-                Packages = 'extras/Flow-Launcher'
-            }
-        )
-    }
 
     Extras          = @(
         @{
             Src  = 'dotfiles/powershell/Profile.ps1'
             Dest = 'PROFILE'
         }
-        # @{
-        #     Src  = 'dotfiles/windowsterminal/settings.json'
-        #     Dest = 'LOCAL_APPDATA\Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\settings.json'
-        # }
     )
 }

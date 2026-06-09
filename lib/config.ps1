@@ -105,19 +105,11 @@ function Find-PackageItemByScoopName {
         [Parameter(Mandatory)] $PackagesDef,
         [Parameter(Mandatory)][string] $ScoopName
     )
-    $groups = @(
-        @($PackagesDef.Recommended)
-        @($PackagesDef.Optional.Dev)
-        @($PackagesDef.Optional.Term)
-        @($PackagesDef.Optional.Beauty)
-    )
-    foreach ($items in $groups) {
-        foreach ($item in $items) {
-            if ([string]$item.Name -eq $ScoopName) { return $item }
-            if ($item.Contains('Packages') -and $null -ne $item.Packages) {
-                foreach ($p in @($item.Packages)) {
-                    if ([string]$p -eq $ScoopName) { return $item }
-                }
+    foreach ($item in Get-AllPackageItems -PackagesDef $PackagesDef) {
+        if ([string]$item.Name -eq $ScoopName) { return $item }
+        if ($item.Contains('Packages') -and $null -ne $item.Packages) {
+            foreach ($p in @($item.Packages)) {
+                if ([string]$p -eq $ScoopName) { return $item }
             }
         }
     }

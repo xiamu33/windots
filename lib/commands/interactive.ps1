@@ -11,12 +11,7 @@ function Get-InteractivePackageSelection {
     )
 
     $isInstallMode = $Mode -eq 'install'
-
-    $pkgSuffix = {
-        param($x)
-        $desc = Get-PackageDesc -Package $x
-        if ($desc) { " ($desc)" } else { '' }
-    }
+    $allPackages = Get-AllPackageItems -PackagesDef $PackagesDef
 
     $testPkgInstalled = {
         param($x)
@@ -24,74 +19,81 @@ function Get-InteractivePackageSelection {
         Test-ScoopInstalled -Name $chk
     }
 
-    $getLockedNames = {
-        param($list)
-        @($list | Where-Object { & $testPkgInstalled $_ } | ForEach-Object { [string]$_.Name })
+    $locked = @($allPackages | Where-Object { & $testPkgInstalled $_ } | ForEach-Object { [string]$_.Name })
+    if ($isInstallMode -and $SavedSelected.Count -gt 0) {
+        $locked = @($SavedSelected + $locked | Select-Object -Unique)
+    }
+    $notInstalled = @($allPackages | Where-Object { -not (& $testPkgInstalled $_) } | ForEach-Object { [string]$_.Name })
+
+    $rows = [System.Collections.Generic.List[object]]::new()
+    $groupStack = [System.Collections.Generic.List[object]]::new()
+    $groupIdx = 0
+
+    function Invoke-PackageMenuWalk {
+        param($Nodes, $GroupDefaults = @())
+        foreach ($node in @($Nodes | Where-Object { $null -ne $_ })) {
+            if ($node.Contains('Items') -and $null -ne $node.Items) {
+                $gd = @($GroupDefaults)
+                if ($node.Contains('Default')) { $gd = @($GroupDefaults + @($node)) }
+                $gi = $groupIdx
+                $groupIdx++
+                $grp = [pscustomobject]@{
+                    Kind           = 'group'
+                    Label          = msg ([string]$node.Title)
+                    GroupIdx       = $gi
+                    Depth          = $groupStack.Count
+                    PackageIndices = [System.Collections.Generic.List[int]]::new()
+                }
+                [void]$rows.Add($grp)
+                [void]$groupStack.Add($grp)
+                Invoke-PackageMenuWalk -Nodes $node.Items -GroupDefaults $gd
+                [void]$groupStack.RemoveAt($groupStack.Count - 1)
+            }
+            elseif ($node.Contains('Name')) {
+                $idx = $rows.Count
+                [void]$rows.Add([pscustomobject]@{
+                        Kind            = 'package'
+                        Label           = [string]$node.Name
+                        Package         = $node
+                        GroupIdx        = if ($groupStack.Count -gt 0) { $groupStack[-1].GroupIdx } else { -1 }
+                        Depth           = $groupStack.Count
+                        ResolvedDefault = Get-ResolvedPackageDefault -Node $node -GroupDefaults $GroupDefaults
+                    })
+                foreach ($g in $groupStack) { [void]$g.PackageIndices.Add($idx) }
+            }
+        }
     }
 
-    $mergeLocked = {
-        param($list)
-        $installed = & $getLockedNames $list
-        if ($isInstallMode -and $SavedSelected.Count -gt 0) {
-            @($SavedSelected + $installed | Select-Object -Unique)
-        }
-        else {
-            $installed
-        }
-    }
+    Invoke-PackageMenuWalk -Nodes @($PackagesDef.Packages)
 
+    $pkgSuffix = {
+        param($row)
+        $desc = Get-PackageDesc -Package $row.Package
+        if ($desc) { " ($desc)" } else { '' }
+    }
     $defaultSetFn = if ($isInstallMode -and $SavedSelected.Count -gt 0) {
-        { param($x) $SavedSelected -contains [string]$x.Name }
+        { param($row) $SavedSelected -contains [string]$row.Package.Name }
     }
     elseif ($isInstallMode) {
-        { param($x) [bool]$x.Default }
+        { param($row) [bool]$row.ResolvedDefault }
     }
     else {
-        { param($x) $false }
+        { param($row) $false }
     }
 
-    $getNotInstalledNames = {
-        param($list)
-        @($list | Where-Object { -not (& $testPkgInstalled $_) } | ForEach-Object { [string]$_.Name })
+    $selectParams = @{
+        Title         = (msg 'interactive.packages.title')
+        Items         = @($rows)
+        Grouped       = $true
+        HintKey       = 'ui.select.tree.hint'
+        Labeler       = { param($row) [string]$row.Label }
+        SuffixLabeler = $pkgSuffix
+        DefaultSet    = $defaultSetFn
     }
+    if ($isInstallMode) { $selectParams['Locked'] = $locked }
+    else { $selectParams['NotInstalled'] = $notInstalled }
 
-    $selectGroup = {
-        param(
-            [string] $TitleKey,
-            $Items
-        )
-        $Items = @($Items | Where-Object { $null -ne $_ })
-        if ($Items.Count -eq 1 -and ($Items[0] -is [System.Array])) {
-            $nested = @($Items[0] | Where-Object { $null -ne $_ })
-            if ($nested.Count -gt 0) { $Items = $nested }
-        }
-        if ($Items.Count -eq 0) { return @() }
-        $selectParams = @{
-            Title         = (msg $TitleKey)
-            Items         = $Items
-            Labeler       = { param($x) [string]$x.Name }
-            SuffixLabeler = $pkgSuffix
-            DefaultSet    = $defaultSetFn
-        }
-        if ($isInstallMode) {
-            $selectParams['Locked'] = & $mergeLocked $Items
-        }
-        else {
-            $selectParams['NotInstalled'] = & $getNotInstalledNames $Items
-        }
-        Select-Items @selectParams
-    }
-
-    $recSel = & $selectGroup 'interactive.packages.rec.title' @($PackagesDef.Recommended)
-    $devSel = & $selectGroup 'interactive.packages.dev.title' @($PackagesDef.Optional.Dev)
-    $termSel = & $selectGroup 'interactive.packages.term.title' @($PackagesDef.Optional.Term)
-    $beautySel = & $selectGroup 'interactive.packages.beauty.title' @($PackagesDef.Optional.Beauty)
-
-    $allSelected = @()
-    foreach ($group in @($recSel, $devSel, $termSel, $beautySel)) {
-        foreach ($s in @($group)) { $allSelected += $s }
-    }
-
+    $allSelected = Select-Items @selectParams
     $selectedPkgNames = [string[]]@($allSelected | ForEach-Object { [string]$_.Name } | Select-Object -Unique)
 
     $scoopAppsList = [System.Collections.Generic.List[string]]::new()
