@@ -165,7 +165,7 @@
     'interactive.mirror.prompt'          = 'Switch scoop to gitee mirror?'
     'interactive.step.packages'          = '--- 4/6 Select Packages ---'
     'interactive.packages.title'         = 'Select packages:'
-    'ui.select.tree.hint'                = '  J/K Move  D/U Group  Space Toggle  A/N Current Group  Shift+A/N All  Enter Confirm  Esc Cancel'
+    'ui.select.tree.hint'                = '  J/K Move  D/U Group  F Fold  Space Toggle  A/N Current Group  Shift+A/N All  Enter Confirm  Esc Cancel'
     'interactive.step.chezmoi'           = '--- 5/6 chezmoi Config Sync ---'
     'interactive.chezmoi.prompt'         = 'Use chezmoi to sync cross-platform configs (nvim/starship/wezterm etc.)?'
     'interactive.chezmoi.user.prompt'    = 'GitHub username or repo URL'

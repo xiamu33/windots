@@ -27,44 +27,52 @@ function Get-InteractivePackageSelection {
 
     $rows = [System.Collections.Generic.List[object]]::new()
     $groupStack = [System.Collections.Generic.List[object]]::new()
-    $groupIdx = 0
+    $nextGroupIdx = 0
 
     function Invoke-PackageMenuWalk {
-        param($Nodes, $GroupDefaults = @())
+        param(
+            $Nodes,
+            $GroupDefaults = @(),
+            [ref] $NextGroupIdx
+        )
         foreach ($node in @($Nodes | Where-Object { $null -ne $_ })) {
             if ($node.Contains('Items') -and $null -ne $node.Items) {
                 $gd = @($GroupDefaults)
                 if ($node.Contains('Default')) { $gd = @($GroupDefaults + @($node)) }
-                $gi = $groupIdx
-                $groupIdx++
+                $gi = $NextGroupIdx.Value
+                $NextGroupIdx.Value = $NextGroupIdx.Value + 1
                 $grp = [pscustomobject]@{
-                    Kind           = 'group'
-                    Label          = msg ([string]$node.Title)
-                    GroupIdx       = $gi
-                    Depth          = $groupStack.Count
-                    PackageIndices = [System.Collections.Generic.List[int]]::new()
+                    Kind                    = 'group'
+                    Label                   = msg ([string]$node.Title)
+                    GroupIdx                = $gi
+                    RowIdx                  = $rows.Count
+                    Depth                   = $groupStack.Count
+                    AncestorGroupRowIndices = @($groupStack | ForEach-Object { [int]$_.RowIdx })
+                    PackageIndices          = [System.Collections.Generic.List[int]]::new()
                 }
                 [void]$rows.Add($grp)
                 [void]$groupStack.Add($grp)
-                Invoke-PackageMenuWalk -Nodes $node.Items -GroupDefaults $gd
+                Invoke-PackageMenuWalk -Nodes $node.Items -GroupDefaults $gd -NextGroupIdx $NextGroupIdx
                 [void]$groupStack.RemoveAt($groupStack.Count - 1)
             }
             elseif ($node.Contains('Name')) {
                 $idx = $rows.Count
                 [void]$rows.Add([pscustomobject]@{
-                        Kind            = 'package'
-                        Label           = [string]$node.Name
-                        Package         = $node
-                        GroupIdx        = if ($groupStack.Count -gt 0) { $groupStack[-1].GroupIdx } else { -1 }
-                        Depth           = $groupStack.Count
-                        ResolvedDefault = Get-ResolvedPackageDefault -Node $node -GroupDefaults $GroupDefaults
+                        Kind                    = 'package'
+                        Label                   = [string]$node.Name
+                        Package                 = $node
+                        GroupIdx                = if ($groupStack.Count -gt 0) { $groupStack[-1].GroupIdx } else { -1 }
+                        RowIdx                  = $rows.Count
+                        Depth                   = $groupStack.Count
+                        AncestorGroupRowIndices = @($groupStack | ForEach-Object { [int]$_.RowIdx })
+                        ResolvedDefault         = Get-ResolvedPackageDefault -Node $node -GroupDefaults $GroupDefaults
                     })
                 foreach ($g in $groupStack) { [void]$g.PackageIndices.Add($idx) }
             }
         }
     }
 
-    Invoke-PackageMenuWalk -Nodes @($PackagesDef.Packages)
+    Invoke-PackageMenuWalk -Nodes @($PackagesDef.Packages) -NextGroupIdx ([ref]$nextGroupIdx)
 
     $pkgSuffix = {
         param($row)

@@ -12,7 +12,7 @@ function Initialize-WindotsConsoleInput {
     $script:WindotsConsoleInputInit = $true
     try { [Console]::TreatControlCAsInput = $true } catch { }
     try {
-        $handler = [ConsoleCancelEventHandler]{
+        $handler = [ConsoleCancelEventHandler] {
             param($sender, $e)
             $e.Cancel = $true
             $now = [DateTime]::UtcNow
@@ -182,7 +182,7 @@ function Clear-ConsoleViewport {
 }
 
 # 多选菜单（↑↓/J/K 移动, 空格切换, A全选, N全不选, Enter确认, Esc取消）
-# -Grouped：分组树模式（D/U 跳组, A/N 当前组, Shift+A/N 全局）
+# -Grouped：分组树模式（D/U 跳组, F 折叠, A/N 当前组, Shift+A/N 全局）
 function Select-Items {
     param(
         [Parameter(Mandatory)][string]   $Title,
@@ -214,11 +214,52 @@ function Select-Items {
         else { [bool](& $DefaultSet $Items[$i]) }
     }
     $cursor = 0
+    $collapsedGroups = @{}
 
     $installedTag = msg 'ui.select.installed'
     $notInstalledTag = msg 'ui.select.not.installed'
     $unsupportedTag = msg 'ui.select.unsupported'
     $hint = msg $HintKey
+
+    $isRowVisible = {
+        param([int] $Idx)
+        if (-not $Grouped) { return $true }
+        $anc = $Items[$Idx].AncestorGroupRowIndices
+        if ($null -eq $anc -or @($anc).Count -eq 0) { return $true }
+        foreach ($a in @($anc)) {
+            if ($collapsedGroups.ContainsKey([int]$a)) { return $false }
+        }
+        return $true
+    }
+
+    $getVisibleRowIndices = {
+        $list = [System.Collections.Generic.List[int]]::new()
+        for ($i = 0; $i -lt $Items.Count; $i++) {
+            if (& $isRowVisible $i) { [void]$list.Add($i) }
+        }
+        return @($list)
+    }
+
+    $moveCursor = {
+        param([int] $From, [int] $Dir)
+        if (-not $Grouped) {
+            return ($From + $Dir + $Items.Count) % $Items.Count
+        }
+        $vis = @(& $getVisibleRowIndices)
+        if ($vis.Count -eq 0) { return $From }
+        $pos = [array]::IndexOf([object[]]$vis, $From)
+        if ($pos -lt 0) { $pos = 0 }
+        $next = ($pos + $Dir + $vis.Count) % $vis.Count
+        return [int]$vis[$next]
+    }
+
+    $resolveGroupRow = {
+        param([int] $From)
+        if (& $isGroupRow $Items[$From]) { return $From }
+        $anc = @($Items[$From].AncestorGroupRowIndices)
+        if ($anc.Count -gt 0) { return [int]$anc[-1] }
+        return $From
+    }
 
     $getRowMark = {
         param([int] $Idx)
@@ -239,6 +280,15 @@ function Select-Items {
         return ' '
     }
 
+    $getGroupBoxMark = {
+        param([int] $Idx, [bool] $Collapsed)
+        $mark = & $getRowMark $Idx
+        if (-not $Collapsed) { return [string]$mark }
+        if ($mark -eq '-') { return '> -' }
+        if ($mark -eq 'x') { return '> x' }
+        return '> '
+    }
+
     $rowSelectable = {
         param([int] $Idx)
         if (& $isGroupRow $Items[$Idx]) { return $true }
@@ -246,10 +296,10 @@ function Select-Items {
         return $Disabled -notcontains $lbl -and $NotInstalled -notcontains $lbl -and $Locked -notcontains $lbl
     }
 
-    $currentGroupIdx = {
-        $row = $Items[$cursor]
-        if (& $isGroupRow $row) { return [int]$row.GroupIdx }
-        if ($Grouped) { return [int]$row.GroupIdx }
+    $currentGroupRow = {
+        if (& $isGroupRow $Items[$cursor]) { return $cursor }
+        $anc = @($Items[$cursor].AncestorGroupRowIndices)
+        if ($anc.Count -gt 0) { return [int]$anc[-1] }
         return -1
     }
 
@@ -268,11 +318,13 @@ function Select-Items {
         }
     }
 
-    $setByGroupIdx = {
-        param([int] $Gi, [bool] $Value)
+    $setByGroupRow = {
+        param([int] $GroupRow, [bool] $Value)
+        if ($GroupRow -lt 0) { return }
         for ($i = 0; $i -lt $Items.Count; $i++) {
             if (-not (& $isPkgRow $Items[$i])) { continue }
-            if ([int]$Items[$i].GroupIdx -ne $Gi) { continue }
+            $anc = @($Items[$i].AncestorGroupRowIndices)
+            if ($anc.Count -eq 0 -or [int]$anc[-1] -ne $GroupRow) { continue }
             $lbl = & $Labeler $Items[$i]
             if ($Value) {
                 if ($Disabled -notcontains $lbl -and $NotInstalled -notcontains $lbl -and $Locked -notcontains $lbl) {
@@ -305,7 +357,7 @@ function Select-Items {
         param([int] $Dir, [int] $From)
         $indices = [System.Collections.Generic.List[int]]::new()
         for ($i = 0; $i -lt $Items.Count; $i++) {
-            if (& $isGroupRow $Items[$i]) { [void]$indices.Add($i) }
+            if ((& $isGroupRow $Items[$i]) -and (& $isRowVisible $i)) { [void]$indices.Add($i) }
         }
         if ($indices.Count -eq 0) { return $From }
         $pos = 0
@@ -322,33 +374,40 @@ function Select-Items {
         if (& $isGroupRow $Items[$From]) {
             return & $jumpGroup -1 $From
         }
-        $gi = [int]$Items[$From].GroupIdx
-        if ($gi -lt 0) { return $From }
-        for ($i = 0; $i -lt $Items.Count; $i++) {
-            if ((& $isGroupRow $Items[$i]) -and ([int]$Items[$i].GroupIdx -eq $gi)) {
-                return $i
-            }
-        }
-        return $From
+        return & $resolveGroupRow $From
     }
 
     $scrollTop = 0
     $firstDraw = $true
 
     while ($true) {
+        $visibleRowIdx = @(& $getVisibleRowIndices)
+        if ($Grouped -and ($visibleRowIdx -notcontains $cursor)) {
+            $cursor = & $resolveGroupRow $cursor
+            if ($visibleRowIdx -notcontains $cursor) {
+                $cursor = if ($visibleRowIdx.Count -gt 0) { [int]$visibleRowIdx[0] } else { 0 }
+            }
+        }
+
         $consoleH = Get-ConsoleHeight
         $listAvail = [Math]::Max(1, $consoleH - 3)
-        $needScroll = $Items.Count -gt $listAvail
-        $viewRows = if ($needScroll) { [Math]::Max(1, $listAvail - 2) } else { $Items.Count }
-        $maxScroll = [Math]::Max(0, $Items.Count - $viewRows)
+        $visCount = if ($Grouped) { $visibleRowIdx.Count } else { $Items.Count }
+        $needScroll = $visCount -gt $listAvail
+        $viewRows = if ($needScroll) { [Math]::Max(1, $listAvail - 2) } else { $visCount }
+        $maxScrollVis = [Math]::Max(0, $visCount - $viewRows)
+        $cursorVisPos = if ($Grouped) {
+            $p = [array]::IndexOf([object[]]$visibleRowIdx, $cursor)
+            if ($p -lt 0) { 0 } else { $p }
+        }
+        else { $cursor }
         # 光标上方预览约视口高度 1/3，至少 1 项（视口过窄时不强制）
         $scrollMargin = 0
         if ($viewRows -gt 1) {
             $scrollMargin = [Math]::Max(1, [Math]::Floor($viewRows / 3))
             $scrollMargin = [Math]::Min($scrollMargin, $viewRows - 1)
         }
-        $idealTop = $cursor - $scrollMargin
-        $scrollTop = [Math]::Max(0, [Math]::Min($idealTop, $maxScroll))
+        $idealTop = $cursorVisPos - $scrollMargin
+        $scrollTopVis = [Math]::Max(0, [Math]::Min($idealTop, $maxScrollVis))
 
         if ($firstDraw) { Clear-Host; $firstDraw = $false }
         else { Clear-ConsoleViewport -Lines $consoleH }
@@ -378,12 +437,13 @@ function Select-Items {
         if ($installedTagBaseWidth -gt 0) { $installedTagBaseWidth += 2 }
         $tagBaseWidth = [Math]::Max($installedTagBaseWidth, $notInstalledTagWidth + 2)
 
-        if ($needScroll -and $scrollTop -gt 0) {
-            Write-Host (msg 'ui.select.scroll.up' $scrollTop) -ForegroundColor DarkGray
+        if ($needScroll -and $scrollTopVis -gt 0) {
+            Write-Host (msg 'ui.select.scroll.up' $scrollTopVis) -ForegroundColor DarkGray
         }
 
-        $viewEnd = [Math]::Min($scrollTop + $viewRows, $Items.Count)
-        for ($i = $scrollTop; $i -lt $viewEnd; $i++) {
+        $renderEnd = [Math]::Min($scrollTopVis + $viewRows, $visCount)
+        for ($vi = $scrollTopVis; $vi -lt $renderEnd; $vi++) {
+            $i = if ($Grouped) { [int]$visibleRowIdx[$vi] } else { $vi }
             $label = & $Labeler $Items[$i]
             $sfx = if ($SuffixLabeler -and (& $isPkgRow $Items[$i])) { [string](& $SuffixLabeler $Items[$i]) } else { '' }
             $prefix = if ($Grouped -and $Items[$i].Depth -gt 0) { '  ' * [int]$Items[$i].Depth } else { '' }
@@ -396,7 +456,8 @@ function Select-Items {
 
             if (& $isGroupRow $Items[$i]) {
                 $color = if ($i -eq $cursor) { [ConsoleColor]::Cyan } else { [ConsoleColor]::Yellow }
-                Write-Host ("$prefix$arrow [$mark] $label") -ForegroundColor $color
+                $box = & $getGroupBoxMark $i $collapsedGroups.ContainsKey($i)
+                Write-Host ("$prefix$arrow [$box] $label") -ForegroundColor $color
                 continue
             }
 
@@ -452,18 +513,26 @@ function Select-Items {
             }
         }
 
-        if ($needScroll -and ($scrollTop + $viewRows) -lt $Items.Count) {
-            $below = $Items.Count - $scrollTop - $viewRows
+        if ($needScroll -and ($scrollTopVis + $viewRows) -lt $visCount) {
+            $below = $visCount - $scrollTopVis - $viewRows
             Write-Host (msg 'ui.select.scroll.down' $below) -ForegroundColor DarkGray
         }
 
         $key = Read-MenuKey
         $shift = ($key.Modifiers -band [ConsoleModifiers]::Shift) -ne 0
         switch ($key.Key) {
-            { $_ -in @('UpArrow', 'K') } { $cursor = ($cursor - 1 + $Items.Count) % $Items.Count }
-            { $_ -in @('DownArrow', 'J') } { $cursor = ($cursor + 1) % $Items.Count }
+            { $_ -in @('UpArrow', 'K') } { $cursor = & $moveCursor $cursor -1 }
+            { $_ -in @('DownArrow', 'J') } { $cursor = & $moveCursor $cursor 1 }
             'D' { if ($Grouped) { $cursor = & $jumpGroup 1 $cursor } }
             'U' { if ($Grouped) { $cursor = & $jumpGroupUp $cursor } }
+            'F' {
+                if ($Grouped) {
+                    $g = & $resolveGroupRow $cursor
+                    if ($collapsedGroups.ContainsKey($g)) { $collapsedGroups.Remove($g) }
+                    else { $collapsedGroups[$g] = $true }
+                    $cursor = $g
+                }
+            }
             'Spacebar' {
                 if (& $isGroupRow $Items[$cursor]) {
                     $mark = & $getRowMark $cursor
@@ -475,7 +544,7 @@ function Select-Items {
             }
             'A' {
                 if ($shift) { & $setAllPackages $true }
-                elseif ($Grouped) { & $setByGroupIdx (& $currentGroupIdx) $true }
+                elseif ($Grouped) { & $setByGroupRow (& $currentGroupRow) $true }
                 else {
                     for ($i = 0; $i -lt $Items.Count; $i++) {
                         if (& $rowSelectable $i) { $selected[$i] = $true }
@@ -484,7 +553,7 @@ function Select-Items {
             }
             'N' {
                 if ($shift) { & $setAllPackages $false }
-                elseif ($Grouped) { & $setByGroupIdx (& $currentGroupIdx) $false }
+                elseif ($Grouped) { & $setByGroupRow (& $currentGroupRow) $false }
                 else {
                     for ($i = 0; $i -lt $Items.Count; $i++) {
                         $lbl = & $Labeler $Items[$i]
