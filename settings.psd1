@@ -32,7 +32,8 @@
         GiteeRepo = 'https://gitee.com/scoop-installer/scoop'
         Buckets   = @(
             'extras',
-            'nerd-fonts'
+            'nerd-fonts',
+            @{ Name = 'abyss'; Url = 'https://gitee.com/abgox/abyss' }
         )
     }
 

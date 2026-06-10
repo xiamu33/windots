@@ -31,75 +31,148 @@
 
     Packages        = @(
         @{
-            Title   = 'ui.packages.group.rec'
-            Default = $true
-            Items   = @(
-                @{ Name = 'curl' }
-                @{ Name = 'fd' }
-                @{ Name = 'sudo' }
-                @{ Name = 'aria2'; Default = $false }
-                @{ Name = 'bat' }
-                @{ Name = 'delta' }
-                @{ Name = 'eza' }
-                @{ Name = 'lsd'; Default = $false }
-                @{ Name = 'fzf' }
-                @{ Name = 'jd' }
-                @{ Name = 'jq' }
-                @{ Name = 'ripgrep' }
-                @{ Name = 'tldr'; Default = $false }
-                @{ Name = 'zoxide' }
-            )
-        }
-        @{
-            Title   = 'ui.packages.group.dev'
-            Default = $false
-            Items   = @(
+            Title = 'pkg.group.cli'
+            Items = @(
                 @{
-                    Name     = 'mise'
-                    Packages = @('mise', 'extras/vcredist2022')
-                }
-                @{ Name = 'fnm' }
-                @{ Name = 'pnpm' }
-                @{ Name = 'rust' }
-            )
-        }
-        @{
-            Title   = 'ui.packages.group.term'
-            Default = $false
-            Items   = @(
-                @{ Name = 'lazygit' }
-                @{ Name = 'neovim' }
-                @{
-                    Name     = 'yazi'
-                    Packages = @('yazi', 'ffmpeg', '7zip', 'jq', 'poppler', 'fd', 'ripgrep', 'fzf', 'zoxide', 'resvg', 'imagemagick')
-                }
-                @{ Name = 'zellij' }
-            )
-        }
-        @{
-            Title   = 'ui.packages.group.beauty'
-            Default = $false
-            Items   = @(
-                @{ Name = 'starship' }
-                @{
-                    Name     = 'glazewm'
-                    Dotfiles = @{ Src = 'dotfiles/glazewm/config.yaml'; Dest = 'HOME\.glzr\glazewm\config.yaml' }
-                }
-                @{
-                    Name     = 'zebar'
-                    Dotfiles = @{ Src = 'dotfiles/zebar/settings.json'; Dest = 'HOME\.glzr\zebar\settings.json' }
-                }
-                @{
-                    Name     = 'yasb'
-                    Dotfiles = @(
-                        @{ Src = 'dotfiles/yasb/config.yaml'; Dest = 'HOME\.config\yasb\config.yaml' }
-                        @{ Src = 'dotfiles/yasb/styles.css'; Dest = 'HOME\.config\yasb\styles.css' }
+                    Title   = 'pkg.group.cli.base'
+                    Default = $true
+                    Items   = @(
+                        @{ Name = '7zip' }
+                        @{ Name = 'curl' }
+                        @{ Name = 'fd' }
+                        @{ Name = 'fzf' }
+                        @{ Name = 'jq' }
+                        @{ Name = 'ripgrep' }
+                        @{ Name = 'zoxide' }
+                        @{ Name = 'aria2'; Default = $false }
+                        @{ Name = 'sudo'; Default = $false }
+                        @{ Name = 'scoop-search'; Default = $false }
+                        @{ Name = 'uutils-coreutils'; Default = $false }
                     )
                 }
                 @{
-                    Name     = 'flow-launcher'
-                    Packages = 'extras/Flow-Launcher'
+                    Title   = 'pkg.group.cli.plus'
+                    Default = $true
+                    Items   = @(
+                        @{ Name = 'bat' }
+                        @{ Name = 'btop' }
+                        @{ Name = 'delta' }
+                        @{ Name = 'eza' }
+                        @{ Name = 'bottom'; Default = $false }
+                        @{ Name = 'lsd'; Default = $false }
+                        @{ Name = 'dark'; Default = $false }
+                        @{ Name = 'jd'; Default = $false }
+                        @{ Name = 'tldr'; Default = $false }
+                    )
                 }
+            )
+        }
+        @{
+            Title   = 'pkg.group.session'
+            Default = $false
+            Items   = @(
+                @{
+                    Title = 'pkg.group.session.term'
+                    Items = @(
+                        @{ Name = 'alacritty'; Packages = 'extras/alacritty' }
+                        @{ Name = 'rio' }
+                        @{ Name = 'nushell'; Packages = 'nu' }
+                        @{ Name = 'vim' }
+                        @{ Name = 'neovim' }
+                        @{ Name = 'zellij' }
+                    )
+                }
+                @{
+                    Title = 'pkg.group.session.enhance'
+                    Items = @(
+                        @{ Name = 'starship' }
+                        @{ Name = 'atuin' }
+                        @{ Name = 'fastfetch' }
+                    )
+                }
+            )
+        }
+        @{
+            Title   = 'pkg.group.dev'
+            Default = $false
+            Items   = @(
+                @{
+                    Title = 'pkg.group.dev.runtime'
+                    Items = @(
+                        @{
+                            Name     = 'mise'
+                            Default  = $true
+                            Packages = @('mise', 'extras/vcredist2022')
+                        }
+                        @{ Name = 'fnm' }
+                        @{ Name = 'pnpm' }
+                        @{ Name = 'rust' }
+                    )
+                }
+                @{
+                    Title = 'pkg.group.dev.tools'
+                    Items = @(
+                        @{ Name = 'lazygit' }
+                        @{
+                            Name     = 'yazi'
+                            Packages = @('yazi', 'ffmpeg', '7zip', 'jq', 'poppler', 'fd', 'ripgrep', 'fzf', 'zoxide', 'resvg', 'imagemagick')
+                        }
+                        @{ Name = 'PSCompletions'; Packages = 'abyss/abgox.PSCompletions' }
+                    )
+                }
+            )
+        }
+        @{
+            Title   = 'pkg.group.desktop'
+            Default = $false
+            Items   = @(
+                @{
+                    Title = 'pkg.group.desktop.wm'
+                    Items = @(
+                        @{
+                            Name     = 'glazewm'
+                            Dotfiles = @{ Src = 'dotfiles/glazewm/config.yaml'; Dest = 'HOME\.glzr\glazewm\config.yaml' }
+                        }
+                        @{
+                            Name     = 'komorebi'
+                            Packages = @('komorebi', 'whkd')
+                        }
+                    )
+                }
+                @{
+                    Title = 'pkg.group.desktop.bar'
+                    Items = @(
+                        @{
+                            Name     = 'zebar'
+                            Dotfiles = @{ Src = 'dotfiles/zebar/settings.json'; Dest = 'HOME\.glzr\zebar\settings.json' }
+                        }
+                        @{
+                            Name     = 'yasb'
+                            Dotfiles = @(
+                                @{ Src = 'dotfiles/yasb/config.yaml'; Dest = 'HOME\.config\yasb\config.yaml' }
+                                @{ Src = 'dotfiles/yasb/styles.css'; Dest = 'HOME\.config\yasb\styles.css' }
+                            )
+                        }
+                        @{ Name = 'tacky-borders'; Packages = 'extras/tacky-borders' }
+                    )
+                }
+            )
+        }
+        @{
+            Title   = 'pkg.group.win'
+            Default = $false
+            Items   = @(
+                @{ Name = 'flow-launcher'; Packages = 'extras/Flow-Launcher' }
+                @{ Name = 'altsnap'; Packages = 'extras/altsnap' }
+                @{ Name = 'InputTip'; Packages = 'abyss/abgox.InputTip-zip' }
+                @{ Name = 'powertoys' }
+            )
+        }
+        @{
+            Title   = 'pkg.group.fonts'
+            Default = $true
+            Items   = @(
+                @{ Name = 'JetBrainsMono-NF'; Packages = 'nerd-fonts/JetBrainsMono-NF' }
             )
         }
     )
