@@ -93,7 +93,6 @@ function Get-InteractivePackageSelection {
         Title         = (msg 'interactive.packages.title')
         Items         = @($rows)
         Grouped       = $true
-        HintKey       = 'ui.select.tree.hint'
         Labeler       = { param($row) [string]$row.Label }
         SuffixLabeler = $pkgSuffix
         DefaultSet    = $defaultSetFn

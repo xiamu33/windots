@@ -183,7 +183,7 @@ function Clear-ConsoleViewport {
 }
 
 # 多选菜单（↑↓/J/K 移动, 空格切换, A全选, N全不选, Enter确认, Esc取消）
-# -Grouped：分组树模式（D/U 跳组, F 折叠, A/N 当前组, Shift+A/N 全局）
+# -Grouped：分组树模式（D/U/→/← 跳组, Shift+D/U 底/顶组, F/Shift+F 折叠, A/N 当前组, Shift+A/N 全局）
 function Select-Items {
     param(
         [Parameter(Mandatory)][string]   $Title,
@@ -220,8 +220,15 @@ function Select-Items {
     $installedTag = msg 'ui.select.installed'
     $notInstalledTag = msg 'ui.select.not.installed'
     $unsupportedTag = msg 'ui.select.unsupported'
-    $hint = msg $HintKey
+    if ($Grouped) {
+        $hintMove = msg 'ui.select.tree.hint.move'
+        $hintSelect = msg 'ui.select.tree.hint.select'
+    }
+    else {
+        $hint = msg $HintKey
+    }
     $cursorColor = $script:WindotsMenuCursorColor
+    $headerLines = if ($Grouped) { 4 } else { 3 }
 
     $isRowVisible = {
         param([int] $Idx)
@@ -379,6 +386,48 @@ function Select-Items {
         return & $resolveGroupRow $From
     }
 
+    $jumpGroupTop = {
+        param([int] $From)
+        for ($i = 0; $i -lt $Items.Count; $i++) {
+            if (& $isGroupRow $Items[$i]) { return $i }
+        }
+        return $From
+    }
+
+    $expandGroupPath = {
+        param([int] $GroupRowIdx)
+        foreach ($a in @($Items[$GroupRowIdx].AncestorGroupRowIndices)) {
+            if ($collapsedGroups.ContainsKey([int]$a)) { $collapsedGroups.Remove([int]$a) }
+        }
+    }
+
+    $jumpGroupBottom = {
+        param([int] $From)
+        for ($i = $Items.Count - 1; $i -ge 0; $i--) {
+            if (& $isGroupRow $Items[$i]) {
+                & $expandGroupPath $i
+                return $i
+            }
+        }
+        return $From
+    }
+
+    $toggleAllGroups = {
+        $groupRows = [System.Collections.Generic.List[int]]::new()
+        for ($i = 0; $i -lt $Items.Count; $i++) {
+            if (& $isGroupRow $Items[$i]) { [void]$groupRows.Add($i) }
+        }
+        if ($groupRows.Count -eq 0) { return }
+        $allCollapsed = $true
+        foreach ($g in $groupRows) {
+            if (-not $collapsedGroups.ContainsKey($g)) { $allCollapsed = $false; break }
+        }
+        if ($allCollapsed) { $collapsedGroups.Clear() }
+        else {
+            foreach ($g in $groupRows) { $collapsedGroups[$g] = $true }
+        }
+    }
+
     $scrollTop = 0
     $firstDraw = $true
 
@@ -392,7 +441,7 @@ function Select-Items {
         }
 
         $consoleH = Get-ConsoleHeight
-        $listAvail = [Math]::Max(1, $consoleH - 3)
+        $listAvail = [Math]::Max(1, $consoleH - $headerLines)
         $visCount = if ($Grouped) { $visibleRowIdx.Count } else { $Items.Count }
         $needScroll = $visCount -gt $listAvail
         $viewRows = if ($needScroll) { [Math]::Max(1, $listAvail - 4) } else { $visCount }
@@ -415,7 +464,13 @@ function Select-Items {
         else { Clear-ConsoleViewport -Lines $consoleH }
 
         Write-Host $Title -ForegroundColor Magenta
-        Write-Host $hint  -ForegroundColor DarkGray
+        if ($Grouped) {
+            Write-Host $hintMove -ForegroundColor DarkGray
+            Write-Host $hintSelect -ForegroundColor DarkGray
+        }
+        else {
+            Write-Host $hint -ForegroundColor DarkGray
+        }
         Write-Host ''
 
         $installedTagBaseWidth = 0
@@ -523,16 +578,31 @@ function Select-Items {
         $key = Read-MenuKey
         $shift = ($key.Modifiers -band [ConsoleModifiers]::Shift) -ne 0
         switch ($key.Key) {
-            { $_ -in @('UpArrow', 'K') } { $cursor = & $moveCursor $cursor -1 }
             { $_ -in @('DownArrow', 'J') } { $cursor = & $moveCursor $cursor 1 }
-            'D' { if ($Grouped) { $cursor = & $jumpGroup 1 $cursor } }
-            'U' { if ($Grouped) { $cursor = & $jumpGroupUp $cursor } }
+            { $_ -in @('UpArrow', 'K') } { $cursor = & $moveCursor $cursor -1 }
+            'RightArrow' { if ($Grouped) { $cursor = & $jumpGroup 1 $cursor } }
+            'LeftArrow' { if ($Grouped) { $cursor = & $jumpGroupUp $cursor } }
+            'D' {
+                if ($Grouped) {
+                    if ($shift) { $cursor = & $jumpGroupBottom $cursor }
+                    else { $cursor = & $jumpGroup 1 $cursor }
+                }
+            }
+            'U' {
+                if ($Grouped) {
+                    if ($shift) { $cursor = & $jumpGroupTop $cursor }
+                    else { $cursor = & $jumpGroupUp $cursor }
+                }
+            }
             'F' {
                 if ($Grouped) {
-                    $g = & $resolveGroupRow $cursor
-                    if ($collapsedGroups.ContainsKey($g)) { $collapsedGroups.Remove($g) }
-                    else { $collapsedGroups[$g] = $true }
-                    $cursor = $g
+                    if ($shift) { & $toggleAllGroups }
+                    else {
+                        $g = & $resolveGroupRow $cursor
+                        if ($collapsedGroups.ContainsKey($g)) { $collapsedGroups.Remove($g) }
+                        else { $collapsedGroups[$g] = $true }
+                        $cursor = $g
+                    }
                 }
             }
             'Spacebar' {
