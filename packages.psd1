@@ -38,16 +38,16 @@
                     Default = $true
                     Items   = @(
                         @{ Name = '7zip' }
+                        @{ Name = 'aria2'; Default = $false }
                         @{ Name = 'curl' }
                         @{ Name = 'fd' }
                         @{ Name = 'fzf' }
                         @{ Name = 'jq' }
                         @{ Name = 'ripgrep' }
-                        @{ Name = 'zoxide' }
-                        @{ Name = 'aria2'; Default = $false }
+                        @{ Name = 'scoop-search' }
                         @{ Name = 'sudo'; Default = $false }
-                        @{ Name = 'scoop-search'; Default = $false }
                         @{ Name = 'uutils-coreutils'; Default = $false }
+                        @{ Name = 'zoxide' }
                     )
                 }
                 @{
@@ -55,13 +55,17 @@
                     Default = $true
                     Items   = @(
                         @{ Name = 'bat' }
+                        @{ Name = 'bottom'; Default = $false }
                         @{ Name = 'btop' }
                         @{ Name = 'delta' }
+                        @{ Name = 'dust'; Default = $false }
+                        @{ Name = 'duf'; Default = $false }
                         @{ Name = 'eza' }
-                        @{ Name = 'bottom'; Default = $false }
-                        @{ Name = 'lsd'; Default = $false }
-                        @{ Name = 'dark'; Default = $false }
+                        @{ Name = 'glow'; Default = $false }
+                        @{ Name = 'hyperfine' }
                         @{ Name = 'jd'; Default = $false }
+                        @{ Name = 'lsd'; Default = $false }
+                        @{ Name = 'tealdeer'; Default = $false }
                         @{ Name = 'tldr'; Default = $false }
                     )
                 }
@@ -75,19 +79,20 @@
                     Title = 'pkg.group.session.term'
                     Items = @(
                         @{ Name = 'alacritty'; Packages = 'extras/alacritty' }
-                        @{ Name = 'rio' }
-                        @{ Name = 'nushell'; Packages = 'nu' }
-                        @{ Name = 'vim' }
                         @{ Name = 'neovim' }
+                        @{ Name = 'nushell'; Packages = 'nu' }
+                        @{ Name = 'rio' }
+                        @{ Name = 'vim' }
                         @{ Name = 'zellij' }
                     )
                 }
                 @{
                     Title = 'pkg.group.session.enhance'
                     Items = @(
-                        @{ Name = 'starship' }
                         @{ Name = 'atuin' }
                         @{ Name = 'fastfetch' }
+                        @{ Name = 'PSCompletions'; Packages = 'abyss/abgox.PSCompletions' }
+                        @{ Name = 'starship' }
                     )
                 }
             )
@@ -99,12 +104,12 @@
                 @{
                     Title = 'pkg.group.dev.runtime'
                     Items = @(
+                        @{ Name = 'fnm' }
                         @{
                             Name     = 'mise'
                             Default  = $true
                             Packages = @('mise', 'extras/vcredist2022')
                         }
-                        @{ Name = 'fnm' }
                         @{ Name = 'pnpm' }
                         @{ Name = 'rust' }
                     )
@@ -112,12 +117,13 @@
                 @{
                     Title = 'pkg.group.dev.tools'
                     Items = @(
+                        @{ Name = 'direnv'; Default = $false }
+                        @{ Name = 'just'; Default = $false }
                         @{ Name = 'lazygit' }
                         @{
                             Name     = 'yazi'
                             Packages = @('yazi', 'ffmpeg', '7zip', 'jq', 'poppler', 'fd', 'ripgrep', 'fzf', 'zoxide', 'resvg', 'imagemagick')
                         }
-                        @{ Name = 'PSCompletions'; Packages = 'abyss/abgox.PSCompletions' }
                     )
                 }
             )
@@ -143,27 +149,29 @@
                     Title = 'pkg.group.desktop.bar'
                     Items = @(
                         @{
-                            Name     = 'zebar'
-                            Dotfiles = @{ Src = 'dotfiles/zebar/settings.json'; Dest = 'HOME\.glzr\zebar\settings.json' }
-                        }
-                        @{
                             Name     = 'yasb'
                             Dotfiles = @(
                                 @{ Src = 'dotfiles/yasb/config.yaml'; Dest = 'HOME\.config\yasb\config.yaml' }
                                 @{ Src = 'dotfiles/yasb/styles.css'; Dest = 'HOME\.config\yasb\styles.css' }
                             )
                         }
-                        @{ Name = 'tacky-borders'; Packages = 'extras/tacky-borders' }
+                        @{
+                            Name     = 'zebar'
+                            Dotfiles = @{ Src = 'dotfiles/zebar/settings.json'; Dest = 'HOME\.glzr\zebar\settings.json' }
+                        }
                     )
                 }
+                @{ Name = 'tacky-borders'; Packages = 'extras/tacky-borders' }
             )
         }
         @{
             Title   = 'pkg.group.win'
             Default = $false
             Items   = @(
-                @{ Name = 'flow-launcher'; Packages = 'extras/Flow-Launcher' }
                 @{ Name = 'altsnap'; Packages = 'extras/altsnap' }
+                @{ Name = 'everything'; Packages = 'extras/everything'; Default = $false }
+                @{ Name = 'everythingtoolbar'; Packages = 'extras/everythingtoolbar'; Default = $false }
+                @{ Name = 'flow-launcher'; Packages = 'extras/Flow-Launcher' }
                 @{ Name = 'InputTip'; Packages = 'abyss/abgox.InputTip-zip' }
                 @{ Name = 'powertoys' }
             )
