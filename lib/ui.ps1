@@ -6,6 +6,7 @@
 $script:WindotsConsoleInputFlush = $false
 $script:WindotsLastCtrlC = [DateTime]::MinValue
 $script:WindotsConsoleInputInit = $false
+$script:WindotsMenuCursorColor = [ConsoleColor]::Red
 
 function Initialize-WindotsConsoleInput {
     if ($script:WindotsConsoleInputInit) { return }
@@ -220,6 +221,7 @@ function Select-Items {
     $notInstalledTag = msg 'ui.select.not.installed'
     $unsupportedTag = msg 'ui.select.unsupported'
     $hint = msg $HintKey
+    $cursorColor = $script:WindotsMenuCursorColor
 
     $isRowVisible = {
         param([int] $Idx)
@@ -393,7 +395,7 @@ function Select-Items {
         $listAvail = [Math]::Max(1, $consoleH - 3)
         $visCount = if ($Grouped) { $visibleRowIdx.Count } else { $Items.Count }
         $needScroll = $visCount -gt $listAvail
-        $viewRows = if ($needScroll) { [Math]::Max(1, $listAvail - 2) } else { $visCount }
+        $viewRows = if ($needScroll) { [Math]::Max(1, $listAvail - 4) } else { $visCount }
         $maxScrollVis = [Math]::Max(0, $visCount - $viewRows)
         $cursorVisPos = if ($Grouped) {
             $p = [array]::IndexOf([object[]]$visibleRowIdx, $cursor)
@@ -455,7 +457,7 @@ function Select-Items {
             $arrow = if ($i -eq $cursor) { '>' } else { ' ' }
 
             if (& $isGroupRow $Items[$i]) {
-                $color = if ($i -eq $cursor) { [ConsoleColor]::Cyan } else { [ConsoleColor]::Yellow }
+                $color = if ($i -eq $cursor) { $cursorColor } else { [ConsoleColor]::Yellow }
                 $box = & $getGroupBoxMark $i $collapsedGroups.ContainsKey($i)
                 Write-Host ("$prefix$arrow [$box] $label") -ForegroundColor $color
                 continue
@@ -467,11 +469,12 @@ function Select-Items {
             elseif ($isNotInstalled) {
                 $lineText = "$prefix$arrow [ ] $label$sfx"
                 $lineWidth = Get-DisplayWidth $lineText
+                $lineColor = if ($i -eq $cursor) { $cursorColor } else { [ConsoleColor]::DarkGray }
                 if ($tagBaseWidth -gt 0) {
-                    Write-Host -NoNewline ($lineText + (' ' * [Math]::Max(0, ($tagBaseWidth - $lineWidth)))) -ForegroundColor DarkGray
+                    Write-Host -NoNewline ($lineText + (' ' * [Math]::Max(0, ($tagBaseWidth - $lineWidth)))) -ForegroundColor $lineColor
                 }
                 else {
-                    Write-Host -NoNewline $lineText -ForegroundColor DarkGray
+                    Write-Host -NoNewline $lineText -ForegroundColor $lineColor
                     Write-Host -NoNewline '  '
                 }
                 Write-Host $notInstalledTag -ForegroundColor DarkGray
@@ -479,19 +482,19 @@ function Select-Items {
             elseif ($isLocked) {
                 $lockedText = "$prefix$arrow [x] $label$sfx"
                 $lockedWidth = Get-DisplayWidth $lockedText
+                $lineColor = if ($i -eq $cursor) { $cursorColor } else { [ConsoleColor]::DarkGray }
                 if ($tagBaseWidth -gt 0) {
-                    Write-Host -NoNewline ($lockedText + (' ' * [Math]::Max(0, ($tagBaseWidth - $lockedWidth)))) -ForegroundColor DarkGray
+                    Write-Host -NoNewline ($lockedText + (' ' * [Math]::Max(0, ($tagBaseWidth - $lockedWidth)))) -ForegroundColor $lineColor
                 }
                 else {
-                    Write-Host -NoNewline $lockedText -ForegroundColor DarkGray
+                    Write-Host -NoNewline $lockedText -ForegroundColor $lineColor
                     Write-Host -NoNewline '  '
                 }
                 Write-Host $installedTag -ForegroundColor DarkGreen
             }
             elseif ($isInstalled) {
-                $color = if ($i -eq $cursor) { [ConsoleColor]::Cyan }
-                elseif ($selected[$i]) { [ConsoleColor]::Green }
-                else { [ConsoleColor]::Gray }
+                $itemColor = if ($selected[$i]) { [ConsoleColor]::Green } else { [ConsoleColor]::Gray }
+                $color = if ($i -eq $cursor) { $cursorColor } else { $itemColor }
                 $lineText = "$prefix$arrow [$mark] $label$sfx"
                 $lineWidth = Get-DisplayWidth $lineText
                 if ($tagBaseWidth -gt 0) {
@@ -504,9 +507,8 @@ function Select-Items {
                 Write-Host $installedTag -ForegroundColor DarkGreen
             }
             else {
-                $color = if ($i -eq $cursor) { [ConsoleColor]::Cyan }
-                elseif ($selected[$i]) { [ConsoleColor]::Green }
-                else { [ConsoleColor]::Gray }
+                $itemColor = if ($selected[$i]) { [ConsoleColor]::Green } else { [ConsoleColor]::Gray }
+                $color = if ($i -eq $cursor) { $cursorColor } else { $itemColor }
                 Write-Host -NoNewline ("$prefix$arrow [$mark] $label") -ForegroundColor $color
                 if ($sfx) { Write-Host $sfx -ForegroundColor DarkCyan }
                 else { Write-Host '' }
@@ -599,7 +601,7 @@ function Select-One {
         for ($i = 0; $i -lt $Items.Count; $i++) {
             $label = & $Labeler $Items[$i]
             $arrow = if ($i -eq $cursor) { '>' } else { ' ' }
-            $color = if ($i -eq $cursor) { [ConsoleColor]::Cyan } else { [ConsoleColor]::Gray }
+            $color = if ($i -eq $cursor) { $script:WindotsMenuCursorColor } else { [ConsoleColor]::Gray }
             Write-Host ("$arrow $label") -ForegroundColor $color
         }
         $key = Read-MenuKey
