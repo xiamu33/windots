@@ -214,7 +214,8 @@ function Select-Items {
         elseif ($Disabled -contains $lbl -or $NotInstalled -contains $lbl) { $false }
         else { [bool](& $DefaultSet $Items[$i]) }
     }
-    $cursor = 0
+    $initialSelected = New-Object 'bool[]' $Items.Count
+    for ($i = 0; $i -lt $Items.Count; $i++) { $initialSelected[$i] = $selected[$i] }
     $collapsedGroups = @{}
 
     $installedTag = msg 'ui.select.installed'
@@ -247,19 +248,6 @@ function Select-Items {
             if (& $isRowVisible $i) { [void]$list.Add($i) }
         }
         return @($list)
-    }
-
-    $moveCursor = {
-        param([int] $From, [int] $Dir)
-        if (-not $Grouped) {
-            return ($From + $Dir + $Items.Count) % $Items.Count
-        }
-        $vis = @(& $getVisibleRowIndices)
-        if ($vis.Count -eq 0) { return $From }
-        $pos = [array]::IndexOf([object[]]$vis, $From)
-        if ($pos -lt 0) { $pos = 0 }
-        $next = ($pos + $Dir + $vis.Count) % $vis.Count
-        return [int]$vis[$next]
     }
 
     $resolveGroupRow = {
@@ -303,6 +291,50 @@ function Select-Items {
         if (& $isGroupRow $Items[$Idx]) { return $true }
         $lbl = & $Labeler $Items[$Idx]
         return $Disabled -notcontains $lbl -and $NotInstalled -notcontains $lbl -and $Locked -notcontains $lbl
+    }
+
+    $getNavigableRowIndices = {
+        $list = [System.Collections.Generic.List[int]]::new()
+        for ($i = 0; $i -lt $Items.Count; $i++) {
+            if (-not (& $isRowVisible $i)) { continue }
+            if (-not (& $rowSelectable $i)) { continue }
+            [void]$list.Add($i)
+        }
+        return @($list)
+    }
+
+    $moveCursor = {
+        param([int] $From, [int] $Dir)
+        $nav = @(& $getNavigableRowIndices)
+        if ($nav.Count -eq 0) { return $From }
+        $pos = [array]::IndexOf([object[]]$nav, $From)
+        if ($pos -lt 0) {
+            if ($Dir -gt 0) {
+                foreach ($i in $nav) { if ($i -ge $From) { return [int]$i } }
+                return [int]$nav[0]
+            }
+            for ($j = $nav.Count - 1; $j -ge 0; $j--) {
+                if ($nav[$j] -le $From) { return [int]$nav[$j] }
+            }
+            return [int]$nav[$nav.Count - 1]
+        }
+        $next = ($pos + $Dir + $nav.Count) % $nav.Count
+        return [int]$nav[$next]
+    }
+
+    $navInit = @(& $getNavigableRowIndices)
+    $cursor = if ($navInit.Count -gt 0) { [int]$navInit[0] } else { 0 }
+
+    $getSelectedCount = {
+        $count = 0
+        for ($i = 0; $i -lt $Items.Count; $i++) {
+            if (-not $selected[$i]) { continue }
+            if (-not (& $rowSelectable $i)) { continue }
+            if ($Grouped -and -not (& $isPkgRow $Items[$i])) { continue }
+            if ($initialSelected[$i]) { continue }
+            $count++
+        }
+        return $count
     }
 
     $currentGroupRow = {
@@ -439,6 +471,10 @@ function Select-Items {
                 $cursor = if ($visibleRowIdx.Count -gt 0) { [int]$visibleRowIdx[0] } else { 0 }
             }
         }
+        $navRowIdx = @(& $getNavigableRowIndices)
+        if ($navRowIdx.Count -gt 0 -and ($navRowIdx -notcontains $cursor)) {
+            $cursor = & $moveCursor $cursor 1
+        }
 
         $consoleH = Get-ConsoleHeight
         $listAvail = [Math]::Max(1, $consoleH - $headerLines)
@@ -471,7 +507,13 @@ function Select-Items {
         else {
             Write-Host $hint -ForegroundColor DarkGray
         }
-        Write-Host ''
+        $selectedCount = & $getSelectedCount
+        if ($selectedCount -gt 0) {
+            Write-Host (msg 'ui.select.selected.count' $selectedCount) -ForegroundColor $cursorColor
+        }
+        else {
+            Write-Host ''
+        }
 
         $installedTagBaseWidth = 0
         $notInstalledTagWidth = Get-DisplayWidth $notInstalledTag

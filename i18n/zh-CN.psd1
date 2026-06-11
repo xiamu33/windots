@@ -20,6 +20,7 @@
     'ui.select.installed'                  = '[已安装]'
     'ui.select.not.installed'              = '[未安装]'
     'ui.select.unsupported'                = '[暂不支持]'
+    'ui.select.selected.count'             = '（已选中{0}项）'
     'ui.single.hint'                       = '  ↑/↓ 移动  Enter 确认'
     'ui.yesno.invalid'                     = '请输入 y 或 n'
     'ui.text.default'                      = '{0} (默认: {1})'

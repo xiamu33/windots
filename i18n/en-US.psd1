@@ -20,6 +20,7 @@
     'ui.select.installed'                = '[installed]'
     'ui.select.not.installed'            = '[not installed]'
     'ui.select.unsupported'              = '[unsupported]'
+    'ui.select.selected.count'           = '({0} selected)'
     'ui.single.hint'                     = '  Up/Down Move  Enter Confirm'
     'ui.yesno.invalid'                   = 'Please enter y or n'
     'ui.text.default'                    = '{0} (default: {1})'
