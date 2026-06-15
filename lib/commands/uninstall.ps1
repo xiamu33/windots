@@ -17,10 +17,11 @@ function Uninstall-WindotsScoopApps {
     Write-Step (msg $StepKey)
     foreach ($name in $AppNames) {
         $pkgItem = Find-PackageItemByScoopName -PackagesDef $Ctx.Packages -ScoopName ([string]$name)
-        $global = if ($pkgItem) {
-            Get-PackageInstallGlobal -PackagesDef $Ctx.Packages -PackageName ([string]$pkgItem.Name)
+        $scope = Get-ScoopAppInstalledScope -Name ([string]$name)
+        $global = ($scope -eq 'global')
+        if ($null -eq $scope -and $pkgItem) {
+            $global = Get-PackageInstallGlobal -PackagesDef $Ctx.Packages -PackageName ([string]$pkgItem.Name)
         }
-        else { $false }
         $appResult = Uninstall-ScoopApp -Name $name -GlobalInstall:$global -WhatIf:$Ctx.WhatIf
         $desc = if ($pkgItem) { Get-PackageDesc -Package $pkgItem } else { '' }
         $Results.Add([pscustomobject]@{

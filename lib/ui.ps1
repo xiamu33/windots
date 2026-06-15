@@ -196,7 +196,12 @@ function Select-Items {
         [string[]]    $Installed = @(),
         [string[]]    $Locked = @(),
         [switch]      $Grouped,
-        [string]      $HintKey = 'ui.select.hint'
+        [string]      $HintKey = 'ui.select.hint',
+        [switch]      $GlobalToggle,
+        [scriptblock] $GlobalSet = $null,
+        [ref]         $GlobalMapOut,
+        [scriptblock] $InstalledChecker = $null,
+        [scriptblock] $InstalledAnyChecker = $null
     )
     $Items = @($Items | Where-Object { $null -ne $_ })
     if ($Items.Count -eq 0) { Write-Warn (msg 'ui.empty' $Title); return @() }
@@ -218,9 +223,20 @@ function Select-Items {
     for ($i = 0; $i -lt $Items.Count; $i++) { $initialSelected[$i] = $selected[$i] }
     $collapsedGroups = @{}
 
+    $globalFlags = New-Object 'bool[]' $Items.Count
+    if ($GlobalToggle) {
+        $setGlobal = if ($GlobalSet) { $GlobalSet } else { { param($x) $false } }
+        for ($i = 0; $i -lt $Items.Count; $i++) {
+            if (& $isGroupRow $Items[$i]) { continue }
+            $globalFlags[$i] = [bool](& $setGlobal $Items[$i])
+        }
+    }
+
     $installedTag = msg 'ui.select.installed'
     $notInstalledTag = msg 'ui.select.not.installed'
     $unsupportedTag = msg 'ui.select.unsupported'
+    $globalTag = if ($GlobalToggle) { msg 'ui.select.global' } else { '' }
+    $globalTagColor = [ConsoleColor]::DarkYellow
     if ($Grouped) {
         $hintMove = msg 'ui.select.tree.hint.move'
         $hintSelect = msg 'ui.select.tree.hint.select'
@@ -286,18 +302,82 @@ function Select-Items {
         return '> '
     }
 
-    $rowSelectable = {
+    $rowNavigable = {
         param([int] $Idx)
         if (& $isGroupRow $Items[$Idx]) { return $true }
         $lbl = & $Labeler $Items[$Idx]
-        return $Disabled -notcontains $lbl -and $NotInstalled -notcontains $lbl -and $Locked -notcontains $lbl
+        return $Disabled -notcontains $lbl -and $NotInstalled -notcontains $lbl
+    }
+
+    $rowMovable = {
+        param([int] $Idx)
+        if (-not (& $rowNavigable $Idx)) { return $false }
+        if (& $isGroupRow $Items[$Idx]) { return $true }
+        $lbl = & $Labeler $Items[$Idx]
+        return $Locked -notcontains $lbl
+    }
+
+    $rowGlobalToggleable = {
+        param([int] $Idx)
+        if (-not $GlobalToggle) { return $false }
+        if (-not (& $isPkgRow $Items[$Idx])) { return $false }
+        if (-not (& $rowNavigable $Idx)) { return $false }
+        $lbl = & $Labeler $Items[$Idx]
+        return $Locked -notcontains $lbl
+    }
+
+    $rowSelectable = {
+        param([int] $Idx)
+        if (-not (& $rowNavigable $Idx)) { return $false }
+        if (& $isGroupRow $Items[$Idx]) { return $true }
+        $lbl = & $Labeler $Items[$Idx]
+        return $Locked -notcontains $lbl
+    }
+
+    $rowInstalledAtScope = {
+        param([int] $Idx)
+        $lbl = & $Labeler $Items[$Idx]
+        if ($GlobalToggle -and ($Locked -contains $lbl) -and $InstalledAnyChecker) {
+            return [bool](& $InstalledAnyChecker $Items[$Idx])
+        }
+        if ($GlobalToggle -and $InstalledChecker) {
+            return [bool](& $InstalledChecker $Items[$Idx] $globalFlags[$Idx])
+        }
+        return ($Installed -contains $lbl)
+    }
+
+    $writePkgTags = {
+        param(
+            [int]    $Idx,
+            [bool]   $ShowInstalled,
+            [string] $LineText,
+            [ConsoleColor] $LineColor,
+            [string] $Suffix = '',
+            [ConsoleColor] $SuffixColor = [ConsoleColor]::DarkCyan
+        )
+        $fullWidth = Get-DisplayWidth ($LineText + $Suffix)
+        Write-Host -NoNewline $LineText -ForegroundColor $LineColor
+        if ($Suffix) { Write-Host -NoNewline $Suffix -ForegroundColor $SuffixColor }
+        if ($tagBaseWidth -gt 0) {
+            Write-Host -NoNewline (' ' * [Math]::Max(0, ($tagBaseWidth - $fullWidth))) -ForegroundColor $LineColor
+        }
+        else {
+            Write-Host -NoNewline '  ' -ForegroundColor $LineColor
+        }
+        if ($ShowInstalled) {
+            Write-Host -NoNewline $installedTag -ForegroundColor DarkGreen
+        }
+        if ($GlobalToggle -and $globalFlags[$Idx]) {
+            Write-Host -NoNewline $globalTag -ForegroundColor $globalTagColor
+        }
+        Write-Host ''
     }
 
     $getNavigableRowIndices = {
         $list = [System.Collections.Generic.List[int]]::new()
         for ($i = 0; $i -lt $Items.Count; $i++) {
             if (-not (& $isRowVisible $i)) { continue }
-            if (-not (& $rowSelectable $i)) { continue }
+            if (-not (& $rowMovable $i)) { continue }
             [void]$list.Add($i)
         }
         return @($list)
@@ -517,6 +597,11 @@ function Select-Items {
 
         $installedTagBaseWidth = 0
         $notInstalledTagWidth = Get-DisplayWidth $notInstalledTag
+        $globalTagWidth = if ($GlobalToggle) { Get-DisplayWidth $globalTag } else { 0 }
+        $installedOnlyWidth = Get-DisplayWidth $installedTag
+        $comboTagWidth = $globalTagWidth
+        if ($globalTagWidth -gt 0 -and $installedOnlyWidth -gt 0) { $comboTagWidth += $installedOnlyWidth }
+        elseif ($installedOnlyWidth -gt 0) { $comboTagWidth = $installedOnlyWidth }
         for ($i = 0; $i -lt $Items.Count; $i++) {
             if (& $isGroupRow $Items[$i]) { continue }
             $label = & $Labeler $Items[$i]
@@ -534,7 +619,7 @@ function Select-Items {
             if ($w -gt $installedTagBaseWidth) { $installedTagBaseWidth = $w }
         }
         if ($installedTagBaseWidth -gt 0) { $installedTagBaseWidth += 2 }
-        $tagBaseWidth = [Math]::Max($installedTagBaseWidth, $notInstalledTagWidth + 2)
+        $tagBaseWidth = [Math]::Max([Math]::Max($installedTagBaseWidth, $notInstalledTagWidth + 2), $comboTagWidth + 2)
 
         if ($needScroll -and $scrollTopVis -gt 0) {
             Write-Host (msg 'ui.select.scroll.up' $scrollTopVis) -ForegroundColor DarkGray
@@ -577,38 +662,31 @@ function Select-Items {
                 Write-Host $notInstalledTag -ForegroundColor DarkGray
             }
             elseif ($isLocked) {
-                $lockedText = "$prefix$arrow [x] $label$sfx"
-                $lockedWidth = Get-DisplayWidth $lockedText
+                $lockedText = "$prefix$arrow [x] $label"
                 $lineColor = if ($i -eq $cursor) { $cursorColor } else { [ConsoleColor]::DarkGray }
-                if ($tagBaseWidth -gt 0) {
-                    Write-Host -NoNewline ($lockedText + (' ' * [Math]::Max(0, ($tagBaseWidth - $lockedWidth)))) -ForegroundColor $lineColor
-                }
-                else {
-                    Write-Host -NoNewline $lockedText -ForegroundColor $lineColor
-                    Write-Host -NoNewline '  '
-                }
-                Write-Host $installedTag -ForegroundColor DarkGreen
+                $suffixColor = [ConsoleColor]::DarkGray
+                & $writePkgTags $i (& $rowInstalledAtScope $i) $lockedText $lineColor $sfx $suffixColor
             }
             elseif ($isInstalled) {
                 $itemColor = if ($selected[$i]) { [ConsoleColor]::Green } else { [ConsoleColor]::Gray }
                 $color = if ($i -eq $cursor) { $cursorColor } else { $itemColor }
-                $lineText = "$prefix$arrow [$mark] $label$sfx"
-                $lineWidth = Get-DisplayWidth $lineText
-                if ($tagBaseWidth -gt 0) {
-                    Write-Host -NoNewline ($lineText + (' ' * [Math]::Max(0, ($tagBaseWidth - $lineWidth)))) -ForegroundColor $color
-                }
-                else {
-                    Write-Host -NoNewline $lineText -ForegroundColor $color
-                    Write-Host -NoNewline '  '
-                }
-                Write-Host $installedTag -ForegroundColor DarkGreen
+                $lineText = "$prefix$arrow [$mark] $label"
+                & $writePkgTags $i $true $lineText $color $sfx
             }
             else {
                 $itemColor = if ($selected[$i]) { [ConsoleColor]::Green } else { [ConsoleColor]::Gray }
                 $color = if ($i -eq $cursor) { $cursorColor } else { $itemColor }
-                Write-Host -NoNewline ("$prefix$arrow [$mark] $label") -ForegroundColor $color
-                if ($sfx) { Write-Host $sfx -ForegroundColor DarkCyan }
-                else { Write-Host '' }
+                $lineText = "$prefix$arrow [$mark] $label"
+                $showInstalled = & $rowInstalledAtScope $i
+                $showTags = $GlobalToggle -and ($globalFlags[$i] -or $showInstalled)
+                if ($showTags) {
+                    & $writePkgTags $i $showInstalled $lineText $color $sfx
+                }
+                else {
+                    Write-Host -NoNewline $lineText -ForegroundColor $color
+                    if ($sfx) { Write-Host $sfx -ForegroundColor DarkCyan }
+                    else { Write-Host '' }
+                }
             }
         }
 
@@ -675,7 +753,22 @@ function Select-Items {
                     }
                 }
             }
+            'G' {
+                if (& $rowGlobalToggleable $cursor) {
+                    $globalFlags[$cursor] = -not $globalFlags[$cursor]
+                }
+            }
             'Enter' {
+                if ($GlobalToggle -and $PSBoundParameters.ContainsKey('GlobalMapOut') -and $null -ne $GlobalMapOut) {
+                    $map = @{}
+                    for ($i = 0; $i -lt $Items.Count; $i++) {
+                        if (-not $selected[$i]) { continue }
+                        if ($Grouped -and -not (& $isPkgRow $Items[$i])) { continue }
+                        $lbl = & $Labeler $Items[$i]
+                        $map[$lbl] = $globalFlags[$i]
+                    }
+                    $GlobalMapOut.Value = $map
+                }
                 $result = [System.Collections.Generic.List[object]]::new()
                 for ($i = 0; $i -lt $Items.Count; $i++) {
                     if (-not $selected[$i]) { continue }
@@ -1122,55 +1215,34 @@ function Test-ScoopAppHiddenInTable {
     return (Get-ScoopAppBaseName -Name $Name) -ieq 'chezmoi'
 }
 
-# 按 packages.psd1 分组展示已选安装包（计划摘要 / 已保存配置）
-function Write-PackageList {
+function Get-PackageTableColumnsNamed {
     param(
-        [Parameter(Mandatory)][string]   $TitleKey,
-        [Parameter(Mandatory)]
-        [AllowEmptyCollection()]
-        [string[]]                       $SelectedNames,
-        [string[]]                       $ScoopApps = @(),
-        [Parameter(Mandatory)]             $PackagesDef
+        [Parameter(Mandatory)][object[]] $Rows,
+        [Parameter(Mandatory)][string]    $NameColKey
     )
+    $seqWidth = Get-SeqColumnWidth -RowCount @($Rows).Count
+    return @(
+        @{ Header = (msg 'ui.packages.col.no'); Index = 0; FixedWidth = $seqWidth; FirstLineOnly = $true }
+        @{ Header = (msg $NameColKey); Index = 1; AutoWidth = $true; FirstLineOnly = $true }
+        @{ Header = (msg 'ui.packages.col.desc'); Index = 2; HalfFlex = $true; Wrap = $true }
+        @{ Header = (msg 'ui.packages.col.deps'); Index = 3; HalfFlex = $true; Wrap = $true; CommaWrap = $true }
+    )
+}
 
-    $selectedSet = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
-    foreach ($n in $SelectedNames) {
-        if (-not [string]::IsNullOrWhiteSpace([string]$n)) {
-            [void]$selectedSet.Add([string]$n)
-        }
-    }
-
-    $scoopList = @($ScoopApps | ForEach-Object { [string]$_ } | Where-Object {
-            -not [string]::IsNullOrWhiteSpace($_) -and -not (Test-ScoopAppHiddenInTable -Name $_)
-        })
-    $itemCount = if ($selectedSet.Count -gt 0) { $selectedSet.Count } else { $scoopList.Count }
-    $scoopCount = if ($scoopList.Count -gt 0) { $scoopList.Count } else { $itemCount }
-    Write-Plan (msg $TitleKey $itemCount $scoopCount)
-
-    $tableWidth = Get-PackageTableWidth
-
-    if ($selectedSet.Count -eq 0) {
-        $seq = 1
-        $fallbackRows = @($scoopList | ForEach-Object {
-                $row = @([string]$seq, (Get-ScoopAppBaseName -Name ([string]$_)))
-                $seq++
-                , $row
-            })
-        $rows = @($fallbackRows)
-        $cols = @(
-            @{ Header = (msg 'ui.packages.col.no'); Index = 0; FixedWidth = (Get-SeqColumnWidth -RowCount $rows.Count); FirstLineOnly = $true }
-            @{ Header = (msg 'ui.packages.col.name'); Index = 1; AutoWidth = $true; FirstLineOnly = $true }
-        )
-        Write-PlanBlock -Lines (Format-DisplayTable -Columns $cols -Rows $rows -TotalWidth $tableWidth)
-        return
-    }
+function Build-PackageListTableRows {
+    param(
+        [Parameter(Mandatory)] $SelectedSet,
+        [Parameter(Mandatory)][hashtable] $PackagesDef,
+        [string[]] $ScoopList,
+        $ResolveState
+    )
 
     $resolvedScoop = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
     $tableRows = [System.Collections.Generic.List[string[]]]::new()
     $orderedItems = [System.Collections.Generic.List[object]]::new()
     Invoke-PackageTreeWalk -Nodes @($PackagesDef.Packages) -Visitor {
         param($Kind, $Node, $GroupDefaults)
-        if ($Kind -eq 'package' -and $selectedSet.Contains([string]$Node.Name)) {
+        if ($Kind -eq 'package' -and $SelectedSet.Contains([string]$Node.Name)) {
             [void]$orderedItems.Add($Node)
         }
     }
@@ -1196,15 +1268,158 @@ function Write-PackageList {
         $seq++
     }
 
-    $extras = @($scoopList | Where-Object { -not $resolvedScoop.Contains([string]$_) })
+    $extras = @($ScoopList | Where-Object { -not $resolvedScoop.Contains([string]$_) })
     foreach ($name in $extras) {
         [void]$tableRows.Add(@([string]$seq, (Get-ScoopAppBaseName -Name ([string]$name)), '', ''))
         $seq++
     }
 
-    $rows = @($tableRows)
+    $listedNames = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+    foreach ($row in $tableRows) {
+        if ($row.Count -gt 1) { [void]$listedNames.Add([string]$row[1]) }
+    }
+    foreach ($n in @($SelectedSet)) {
+        $name = [string]$n
+        if ($listedNames.Contains($name)) { continue }
+        [void]$tableRows.Add(@([string]$seq, $name, '', ''))
+        $seq++
+    }
+
+    return @($tableRows)
+}
+
+function Write-PackageListScopeSection {
+    param(
+        [Parameter(Mandatory)][string]      $TitleKey,
+        [Parameter(Mandatory)]              $SelectedSet,
+        [Parameter(Mandatory)][hashtable]   $PackagesDef,
+        [string[]]                          $ScoopList,
+        $ResolveState,
+        [Parameter(Mandatory)][bool]        $GlobalInstall,
+        [Parameter(Mandatory)][string]      $NameColKey,
+        [Parameter(Mandatory)][int]         $TableWidth
+    )
+
+    $namesInScope = [System.Collections.Generic.List[string]]::new()
+    foreach ($n in @($SelectedSet)) {
+        $name = [string]$n
+        $isGlobal = Get-PackageInstallGlobal -PackagesDef $PackagesDef -PackageName $name -State $ResolveState
+        if ($isGlobal -eq $GlobalInstall) { [void]$namesInScope.Add($name) }
+    }
+
+    if ($namesInScope.Count -eq 0) { return }
+
+    $scopeSet = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+    foreach ($n in $namesInScope) { [void]$scopeSet.Add([string]$n) }
+
+    $scopeScoopApps = Get-ScoopAppsForPackageNames -PackagesDef $PackagesDef -PackageNames @($namesInScope)
+    $scopedScoopList = @($ScoopList | Where-Object {
+            $app = [string]$_
+            if ([string]::IsNullOrWhiteSpace($app)) { return $false }
+            $pkgItem = Find-PackageItemByScoopName -PackagesDef $PackagesDef -ScoopName $app
+            if ($pkgItem) { return $scopeSet.Contains([string]$pkgItem.Name) }
+            return $scopeScoopApps -contains $app
+        })
+    if ($scopedScoopList.Count -eq 0) { $scopedScoopList = @($scopeScoopApps) }
+    $scoopCount = @($scopedScoopList | Where-Object { -not (Test-ScoopAppHiddenInTable -Name $_) }).Count
+    if ($scoopCount -eq 0) { $scoopCount = $namesInScope.Count }
+
+    $rows = Build-PackageListTableRows -SelectedSet $scopeSet -PackagesDef $PackagesDef `
+        -ScoopList $scopedScoopList -ResolveState $ResolveState
+    if ($rows.Count -eq 0) { return }
+
+    $scopedTitleKey = if ($GlobalInstall) { "$TitleKey.global" } else { "$TitleKey.user" }
+    Write-Plan (msg $scopedTitleKey $namesInScope.Count $scoopCount)
     Write-PlanBlock -Lines (Format-DisplayTable `
-            -Columns (Get-PackageTableColumns -Rows $rows -TotalWidth $tableWidth) `
+            -Columns (Get-PackageTableColumnsNamed -Rows $rows -NameColKey $NameColKey) `
             -Rows     $rows `
-            -TotalWidth $tableWidth)
+            -TotalWidth $TableWidth)
+}
+
+# 按 packages.psd1 分组展示已选安装包（计划摘要 / 已保存配置）
+function Write-PackageList {
+    param(
+        [Parameter(Mandatory)][string]   $TitleKey,
+        [Parameter(Mandatory)]
+        [AllowEmptyCollection()]
+        [string[]]                       $SelectedNames,
+        [string[]]                       $ScoopApps = @(),
+        [Parameter(Mandatory)]             $PackagesDef,
+        [hashtable]                      $PackageGlobal = $null,
+        $State = $null
+    )
+
+    $selectedSet = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+    foreach ($n in $SelectedNames) {
+        if (-not [string]::IsNullOrWhiteSpace([string]$n)) {
+            [void]$selectedSet.Add([string]$n)
+        }
+    }
+
+    $scoopList = @($ScoopApps | ForEach-Object { [string]$_ } | Where-Object {
+            -not [string]::IsNullOrWhiteSpace($_) -and -not (Test-ScoopAppHiddenInTable -Name $_)
+        })
+
+    $resolveState = $State
+    if ($null -ne $PackageGlobal) {
+        $resolveState = @{ Package_Global = $PackageGlobal }
+    }
+
+    Write-Plan (msg 'interactive.plan.scoop.root' (Format-ScoopPathDisplay -Scope 'user'))
+    Write-Plan (msg 'interactive.plan.scoop.global_path' (Format-ScoopPathDisplay -Scope 'global'))
+
+    $tableWidth = Get-PackageTableWidth
+
+    if ($selectedSet.Count -eq 0) {
+        if ($scoopList.Count -eq 0) { return }
+        $userApps = [System.Collections.Generic.List[string]]::new()
+        $globalApps = [System.Collections.Generic.List[string]]::new()
+        foreach ($app in $scoopList) {
+            $pkgItem = Find-PackageItemByScoopName -PackagesDef $PackagesDef -ScoopName $app
+            $isGlobal = if ($pkgItem) {
+                Get-PackageInstallGlobal -PackagesDef $PackagesDef -PackageName ([string]$pkgItem.Name) -State $resolveState
+            }
+            else { $false }
+            if ($isGlobal) { [void]$globalApps.Add($app) }
+            else { [void]$userApps.Add($app) }
+        }
+        if ($userApps.Count -gt 0) {
+            Write-Plan (msg "$TitleKey.user" $userApps.Count $userApps.Count)
+            $seq = 1
+            $rows = [System.Collections.Generic.List[string[]]]::new()
+            foreach ($app in $userApps) {
+                [void]$rows.Add(@([string]$seq, (Get-ScoopAppBaseName -Name ([string]$app))))
+                $seq++
+            }
+            $rowArr = @($rows)
+            $cols = @(
+                @{ Header = (msg 'ui.packages.col.no'); Index = 0; FixedWidth = (Get-SeqColumnWidth -RowCount $rows.Count); FirstLineOnly = $true }
+                @{ Header = (msg 'ui.packages.col.name.user'); Index = 1; AutoWidth = $true; FirstLineOnly = $true }
+            )
+            Write-PlanBlock -Lines (Format-DisplayTable -Columns $cols -Rows $rowArr -TotalWidth $tableWidth)
+        }
+        if ($globalApps.Count -gt 0) {
+            Write-Plan (msg "$TitleKey.global" $globalApps.Count $globalApps.Count)
+            $seq = 1
+            $rows = [System.Collections.Generic.List[string[]]]::new()
+            foreach ($app in $globalApps) {
+                [void]$rows.Add(@([string]$seq, (Get-ScoopAppBaseName -Name ([string]$app))))
+                $seq++
+            }
+            $rowArr = @($rows)
+            $cols = @(
+                @{ Header = (msg 'ui.packages.col.no'); Index = 0; FixedWidth = (Get-SeqColumnWidth -RowCount $rows.Count); FirstLineOnly = $true }
+                @{ Header = (msg 'ui.packages.col.name.global'); Index = 1; AutoWidth = $true; FirstLineOnly = $true }
+            )
+            Write-PlanBlock -Lines (Format-DisplayTable -Columns $cols -Rows $rowArr -TotalWidth $tableWidth)
+        }
+        return
+    }
+
+    Write-PackageListScopeSection -TitleKey $TitleKey -SelectedSet $selectedSet `
+        -PackagesDef $PackagesDef -ScoopList $scoopList -ResolveState $resolveState `
+        -GlobalInstall $false -NameColKey 'ui.packages.col.name.user' -TableWidth $tableWidth
+    Write-PackageListScopeSection -TitleKey $TitleKey -SelectedSet $selectedSet `
+        -PackagesDef $PackagesDef -ScoopList $scoopList -ResolveState $resolveState `
+        -GlobalInstall $true -NameColKey 'ui.packages.col.name.global' -TableWidth $tableWidth
 }

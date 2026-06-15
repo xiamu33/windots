@@ -226,6 +226,32 @@ function Install-ScoopApp {
     return (New-ScoopStepResult -Status 'ok' -Detail (msg 'summary.detail.app.ok'))
 }
 
+function Install-ScoopAppResolved {
+    param(
+        [Parameter(Mandatory)][string] $Name,
+        [Parameter(Mandatory)][bool]   $TargetGlobal,
+        [switch] $WhatIf
+    )
+    $displayName = Get-ScoopAppBaseName -Name $Name
+    $targetScope = if ($TargetGlobal) { 'global' } else { 'user' }
+    $installedScope = Get-ScoopAppInstalledScope -Name $Name
+
+    if ($installedScope -eq $targetScope) {
+        return (Install-ScoopApp -Name $Name -GlobalInstall:$TargetGlobal -WhatIf:$WhatIf)
+    }
+
+    if ($null -ne $installedScope) {
+        $fromLabel = if ($installedScope -eq 'global') { (msg 'scoop.scope.global') } else { (msg 'scoop.scope.user') }
+        $toLabel = if ($targetScope -eq 'global') { (msg 'scoop.scope.global') } else { (msg 'scoop.scope.user') }
+        Write-Info (msg 'scoop.scope.migrating' $displayName $fromLabel $toLabel)
+        $oldGlobal = ($installedScope -eq 'global')
+        $un = Uninstall-ScoopApp -Name $Name -GlobalInstall:$oldGlobal -WhatIf:$WhatIf
+        if ($un.Status -eq 'failed') { return $un }
+    }
+
+    return (Install-ScoopApp -Name $Name -GlobalInstall:$TargetGlobal -WhatIf:$WhatIf)
+}
+
 function Uninstall-ScoopApp {
     param(
         [Parameter(Mandatory)][string] $Name,

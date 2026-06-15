@@ -138,6 +138,63 @@ function Test-ScoopInstalled {
     return (Get-WindotsScoopList -GlobalInstall).ContainsKey($key)
 }
 
+function Test-ScoopInstalledAtScope {
+    param(
+        [Parameter(Mandatory)][string] $Name,
+        [Parameter(Mandatory)][bool]    $GlobalInstall
+    )
+    $base = Get-ScoopAppBaseName -Name $Name
+    $key = $base.ToLowerInvariant()
+    if ($GlobalInstall) {
+        return (Get-WindotsScoopList -GlobalInstall).ContainsKey($key)
+    }
+    return (Get-WindotsScoopList).ContainsKey($key)
+}
+
+function Get-ScoopAppInstalledScope {
+    param([Parameter(Mandatory)][string] $Name)
+    $base = Get-ScoopAppBaseName -Name $Name
+    $key = $base.ToLowerInvariant()
+    if ((Get-WindotsScoopList).ContainsKey($key)) { return 'user' }
+    if ((Get-WindotsScoopList -GlobalInstall).ContainsKey($key)) { return 'global' }
+    return $null
+}
+
+function Test-ScoopPathIsDefault {
+    param(
+        [Parameter(Mandatory)]
+        [ValidateSet('user', 'global')]
+        [string] $Scope
+    )
+    if ($Scope -eq 'user') {
+        if (-not [string]::IsNullOrWhiteSpace($env:SCOOP)) { return $false }
+        if (Test-CommandExists -Name 'scoop') {
+            $cfg = (& scoop config root_path 2>$null | Out-String).Trim()
+            if (-not [string]::IsNullOrWhiteSpace($cfg)) { return $false }
+        }
+        return $true
+    }
+    if (-not [string]::IsNullOrWhiteSpace($env:SCOOP_GLOBAL)) { return $false }
+    if (Test-CommandExists -Name 'scoop') {
+        $cfg = (& scoop config global_path 2>$null | Out-String).Trim()
+        if (-not [string]::IsNullOrWhiteSpace($cfg)) { return $false }
+    }
+    return $true
+}
+
+function Format-ScoopPathDisplay {
+    param(
+        [Parameter(Mandatory)]
+        [ValidateSet('user', 'global')]
+        [string] $Scope
+    )
+    $path = if ($Scope -eq 'user') { Get-ScoopUserRoot } else { Get-ScoopGlobalRoot }
+    if (Test-ScoopPathIsDefault -Scope $Scope) {
+        return (msg 'interactive.plan.scoop.path.default' $path)
+    }
+    return [string]$path
+}
+
 function Get-WindotsBucketList {
     if ($null -ne $Global:WindotsBucketList) { return $Global:WindotsBucketList }
     $map = @{}

@@ -132,7 +132,10 @@ function ConvertTo-PsLiteral {
     }
     if ($Value -is [hashtable]) {
         $parts = @()
-        foreach ($k in $Value.Keys) { $parts += "$k = $(ConvertTo-PsLiteral -Value $Value[$k])" }
+        foreach ($k in $Value.Keys) {
+            $keyLit = "'" + ([string]$k -replace "'", "''") + "'"
+            $parts += "$keyLit = $(ConvertTo-PsLiteral -Value $Value[$k])"
+        }
         return '@{ ' + ($parts -join '; ') + ' }'
     }
     return "'" + ($Value.ToString() -replace "'", "''") + "'"

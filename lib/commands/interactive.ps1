@@ -6,6 +6,7 @@ function Get-InteractivePackageSelection {
     param(
         [Parameter(Mandatory)][hashtable] $PackagesDef,
         [string[]]                        $SavedSelected = @(),
+        [hashtable]                       $SavedPackageGlobal = $null,
         [ValidateSet('install', 'uninstall')]
         [string]                          $Mode = 'install'
     )
@@ -13,16 +14,14 @@ function Get-InteractivePackageSelection {
     $isInstallMode = $Mode -eq 'install'
     $allPackages = Get-AllPackageItems -PackagesDef $PackagesDef
 
-    $testPkgInstalled = {
-        param($x)
-        Test-PackageItemScoopInstalled -PackageItem $x -PackagesDef $PackagesDef
-    }
+    $locked = @($allPackages | Where-Object {
+            (Test-PackageItemScoopInstalledAnyScope -PackageItem $_) -or
+            ($isInstallMode -and $SavedSelected -contains [string]$_.Name)
+        } | ForEach-Object { [string]$_.Name } | Select-Object -Unique)
 
-    $locked = @($allPackages | Where-Object { & $testPkgInstalled $_ } | ForEach-Object { [string]$_.Name })
-    if ($isInstallMode -and $SavedSelected.Count -gt 0) {
-        $locked = @($SavedSelected + $locked | Select-Object -Unique)
-    }
-    $notInstalled = @($allPackages | Where-Object { -not (& $testPkgInstalled $_) } | ForEach-Object { [string]$_.Name })
+    $notInstalled = @($allPackages | Where-Object {
+            -not (Test-PackageItemScoopInstalledAnyScope -PackageItem $_)
+        } | ForEach-Object { [string]$_.Name })
 
     $rows = [System.Collections.Generic.List[object]]::new()
     $groupStack = [System.Collections.Generic.List[object]]::new()
@@ -37,7 +36,7 @@ function Get-InteractivePackageSelection {
         foreach ($node in @($Nodes | Where-Object { $null -ne $_ })) {
             if ($node.Contains('Items') -and $null -ne $node.Items) {
                 $gd = @($GroupDefaults)
-                if ($node.Contains('Default')) { $gd = @($GroupDefaults + @($node)) }
+                if ($node.Contains('Default') -or $node.Contains('Global')) { $gd = @($GroupDefaults + @($node)) }
                 $gi = $NextGroupIdx.Value
                 $NextGroupIdx.Value = $NextGroupIdx.Value + 1
                 $grp = [pscustomobject]@{
@@ -65,6 +64,7 @@ function Get-InteractivePackageSelection {
                         Depth                   = $groupStack.Count
                         AncestorGroupRowIndices = @($groupStack | ForEach-Object { [int]$_.RowIdx })
                         ResolvedDefault         = Get-ResolvedPackageDefault -Node $node -GroupDefaults $GroupDefaults
+                        ResolvedGlobal          = Get-ResolvedPackageGlobal -Node $node -GroupDefaults $GroupDefaults
                     })
                 foreach ($g in $groupStack) { [void]$g.PackageIndices.Add($idx) }
             }
@@ -88,6 +88,8 @@ function Get-InteractivePackageSelection {
         { param($row) $false }
     }
 
+    $globalMapOut = @{}
+    $globalMapRef = [ref]$globalMapOut
     $selectParams = @{
         Title         = (msg 'interactive.packages.title')
         Items         = @($rows)
@@ -96,13 +98,43 @@ function Get-InteractivePackageSelection {
         SuffixLabeler = $pkgSuffix
         DefaultSet    = $defaultSetFn
     }
-    if ($isInstallMode) { $selectParams['Locked'] = $locked }
+    if ($isInstallMode) {
+        $selectParams['Locked'] = $locked
+        $selectParams['GlobalToggle'] = $true
+        $selectParams['GlobalMapOut'] = $globalMapRef
+        $selectParams['GlobalSet'] = {
+            param($row)
+            $pkgName = [string]$row.Package.Name
+            if ($null -ne $SavedPackageGlobal -and $SavedPackageGlobal.Contains($pkgName)) {
+                return [bool]$SavedPackageGlobal[$pkgName]
+            }
+            return [bool]$row.ResolvedGlobal
+        }
+        $selectParams['InstalledChecker'] = {
+            param($row, $isGlobal)
+            Test-PackageItemScoopInstalledAtScope -PackageItem $row.Package -InstallGlobal $isGlobal
+        }
+        $selectParams['InstalledAnyChecker'] = {
+            param($row)
+            Test-PackageItemScoopInstalledAnyScope -PackageItem $row.Package
+        }
+    }
     else { $selectParams['NotInstalled'] = $notInstalled }
 
     $allSelected = Select-Items @selectParams
     if ($null -eq $allSelected) { return $null }
 
     $selectedPkgNames = [string[]]@($allSelected | ForEach-Object { [string]$_.Name } | Select-Object -Unique)
+
+    $packageGlobal = @{}
+    foreach ($name in $selectedPkgNames) {
+        if ($globalMapOut.ContainsKey($name)) {
+            $packageGlobal[$name] = [bool]$globalMapOut[$name]
+        }
+        else {
+            $packageGlobal[$name] = Get-PackageInstallGlobal -PackagesDef $PackagesDef -PackageName $name
+        }
+    }
 
     $scoopAppsList = [System.Collections.Generic.List[string]]::new()
     foreach ($item in $allSelected) {
@@ -114,6 +146,7 @@ function Get-InteractivePackageSelection {
     return @{
         SelectedPkgNames = $selectedPkgNames
         ScoopApps        = @($scoopAppsList)
+        Package_Global   = $packageGlobal
     }
 }
 
@@ -128,6 +161,7 @@ function Invoke-InteractivePackages {
     if ($State.Contains('Selected_Packages') -and $null -ne $State['Selected_Packages']) {
         $savedSelected = @($State['Selected_Packages'] | ForEach-Object { [string]$_ })
     }
+    $savedPackageGlobal = Get-StatePackageGlobalMap -State $State
 
     Write-Step (msg 'install.interactive.title')
     Write-Info  (msg 'interactive.repo' $Ctx.Root)
@@ -135,7 +169,8 @@ function Invoke-InteractivePackages {
     Write-Info  ''
 
     Write-Step (msg 'interactive.step.packages')
-    $selection = Get-InteractivePackageSelection -PackagesDef $pkg -SavedSelected $savedSelected
+    $selection = Get-InteractivePackageSelection -PackagesDef $pkg `
+        -SavedSelected $savedSelected -SavedPackageGlobal $savedPackageGlobal
     if ($null -eq $selection) {
         Write-Info (msg 'interactive.cancelled')
         return $null
@@ -148,7 +183,8 @@ function Invoke-InteractivePackages {
     Write-PackageList -TitleKey 'install.plan.packages' `
         -SelectedNames $selection.SelectedPkgNames `
         -ScoopApps     $selection.ScoopApps `
-        -PackagesDef   $pkg
+        -PackagesDef   $pkg `
+        -PackageGlobal $selection.Package_Global
     if (@($newNames).Count -gt 0) {
         Write-Plan (msg 'install.plan.added' ($newNames -join ', '))
     }
@@ -159,6 +195,8 @@ function Invoke-InteractivePackages {
 
     $State['Scoop_Apps'] = @($selection.ScoopApps | ForEach-Object { [string]$_ })
     $State['Selected_Packages'] = @($selection.SelectedPkgNames | ForEach-Object { [string]$_ })
+    Set-StatePackageGlobal -State $State -SelectedNames $selection.SelectedPkgNames `
+        -PackageGlobalMap $selection.Package_Global -PackagesDef $pkg
 
     return [pscustomobject]@{
         PlannedState    = $State
@@ -178,6 +216,7 @@ function Invoke-InteractivePackagesUninstall {
     if ($State.Contains('Selected_Packages') -and $null -ne $State['Selected_Packages']) {
         $savedSelected = @($State['Selected_Packages'] | ForEach-Object { [string]$_ })
     }
+    $savedPackageGlobal = Get-StatePackageGlobalMap -State $State
 
     if ($savedSelected.Count -eq 0) {
         Write-Warn (msg 'uninstall.none.selected')
@@ -230,12 +269,22 @@ function Invoke-InteractivePackagesUninstall {
     $finalRemainingNames = [string[]]@($savedSelected | Where-Object { $packagesPlannedForRemoval -notcontains $_ })
     $remainingScoopApps = Get-ScoopAppsForPackageNames -PackagesDef $pkg -PackageNames $finalRemainingNames
 
+    $remainingPackageGlobal = @{}
+    if ($null -ne $savedPackageGlobal) {
+        foreach ($n in $finalRemainingNames) {
+            if ($savedPackageGlobal.Contains($n)) {
+                $remainingPackageGlobal[$n] = [bool]$savedPackageGlobal[$n]
+            }
+        }
+    }
+
     Clear-Host
     Write-Step (msg 'uninstall.plan.title')
     Write-PackageList -TitleKey 'uninstall.plan.remaining' `
         -SelectedNames $finalRemainingNames `
         -ScoopApps     $remainingScoopApps `
-        -PackagesDef   $pkg
+        -PackagesDef   $pkg `
+        -PackageGlobal $remainingPackageGlobal
     if (@($packagesPlannedForRemoval).Count -gt 0) {
         Write-Plan (msg 'uninstall.plan.removed' ($packagesPlannedForRemoval -join ', '))
     }
@@ -324,6 +373,7 @@ function Invoke-Interactive {
     }
     $selectedPkgNames = $selection.SelectedPkgNames
     $scoopApps = $selection.ScoopApps
+    $packageGlobal = $selection.Package_Global
 
     # ------------------------------------------------------------------
     # 5. chezmoi
@@ -375,7 +425,8 @@ function Invoke-Interactive {
     Write-PackageList -TitleKey 'interactive.plan.packages' `
         -SelectedNames $selectedPkgNames `
         -ScoopApps     $scoopApps `
-        -PackagesDef   $pkg
+        -PackagesDef   $pkg `
+        -PackageGlobal $packageGlobal
     Write-Plan (msg 'interactive.plan.chezmoi'  $(if ($useChezmoi) { $chezmoiUser } else { msg 'interactive.plan.chezmoi.skip' }))
     Write-Plan (msg 'interactive.plan.conflict' $conflictMode)
     Write-Plan (msg 'interactive.plan.linkmode' $linkMode)
@@ -390,6 +441,7 @@ function Invoke-Interactive {
         Scoop_Mirror      = [bool]$useScoopMirror
         Scoop_Apps        = @($scoopApps | ForEach-Object { [string]$_ })
         Selected_Packages = @($selectedPkgNames | ForEach-Object { [string]$_ })
+        Package_Global    = $packageGlobal
         Chezmoi_Use       = [bool]$useChezmoi
         Chezmoi_User      = [string]$chezmoiUser
         Chezmoi_Apply     = [bool]$chezmoiApply

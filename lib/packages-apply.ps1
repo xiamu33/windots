@@ -47,11 +47,32 @@ function Get-ResolvedPackageGlobal {
     return $false
 }
 
+function Get-StatePackageGlobalMap {
+    param($State)
+
+    if ($null -eq $State) { return $null }
+    $pg = $null
+    if ($State -is [hashtable] -and $State.Contains('Package_Global')) {
+        $pg = $State['Package_Global']
+    }
+    elseif ($null -ne $State.PSObject.Properties['Package_Global']) {
+        $pg = $State.Package_Global
+    }
+    if ($null -eq $pg -or $pg -isnot [hashtable]) { return $null }
+    return $pg
+}
+
 function Get-PackageInstallGlobal {
     param(
         [Parameter(Mandatory)][hashtable] $PackagesDef,
-        [Parameter(Mandatory)][string]    $PackageName
+        [Parameter(Mandatory)][string]    $PackageName,
+        $State = $null
     )
+
+    $pg = Get-StatePackageGlobalMap -State $State
+    if ($null -ne $pg -and $pg.Contains($PackageName)) {
+        return [bool]$pg[$PackageName]
+    }
 
     $match = @{
         Found         = $false
@@ -67,19 +88,76 @@ function Get-PackageInstallGlobal {
     return [bool]$match.InstallGlobal
 }
 
+function Test-PackageItemScoopInstalledAtScope {
+    param(
+        [Parameter(Mandatory)]            $PackageItem,
+        [Parameter(Mandatory)][bool]      $InstallGlobal
+    )
+
+    foreach ($app in (Get-PackageItemScoopApps -PackageItem $PackageItem)) {
+        if (Test-ScoopInstalledAtScope -Name $app -GlobalInstall:$InstallGlobal) { return $true }
+    }
+    return $false
+}
+
+function Test-PackageItemScoopInstalledAnyScope {
+    param([Parameter(Mandatory)] $PackageItem)
+
+    foreach ($app in (Get-PackageItemScoopApps -PackageItem $PackageItem)) {
+        if ($null -ne (Get-ScoopAppInstalledScope -Name $app)) { return $true }
+    }
+    return $false
+}
+
 function Test-PackageItemScoopInstalled {
     param(
         [Parameter(Mandatory)]            $PackageItem,
-        [Parameter(Mandatory)][hashtable] $PackagesDef
+        [Parameter(Mandatory)][hashtable] $PackagesDef,
+        $State = $null
     )
 
     $name = [string]$PackageItem.Name
-    $global = Get-PackageInstallGlobal -PackagesDef $PackagesDef -PackageName $name
-    $apps = Get-PackageItemScoopApps -PackageItem $PackageItem
-    foreach ($app in $apps) {
-        if (Test-ScoopInstalled -Name $app -GlobalInstall:$global) { return $true }
+    $global = Get-PackageInstallGlobal -PackagesDef $PackagesDef -PackageName $name -State $State
+    return (Test-PackageItemScoopInstalledAtScope -PackageItem $PackageItem -InstallGlobal $global)
+}
+
+function Set-StatePackageGlobal {
+    param(
+        [Parameter(Mandatory)]                 $State,
+        [Parameter(Mandatory)]
+        [AllowEmptyCollection()]
+        [string[]]                             $SelectedNames,
+        [hashtable]                            $PackageGlobalMap,
+        [Parameter(Mandatory)][hashtable]      $PackagesDef
+    )
+
+    $pg = @{}
+    foreach ($n in @($SelectedNames | ForEach-Object { [string]$_ })) {
+        if ($null -ne $PackageGlobalMap -and $PackageGlobalMap.Contains($n)) {
+            $pg[$n] = [bool]$PackageGlobalMap[$n]
+        }
+        else {
+            $pg[$n] = Get-PackageInstallGlobal -PackagesDef $PackagesDef -PackageName $n -State $State
+        }
     }
-    return $false
+    $State['Package_Global'] = $pg
+}
+
+function Remove-StatePackageGlobalEntries {
+    param(
+        [Parameter(Mandatory)]            $State,
+        [Parameter(Mandatory)][string[]] $PackageNames
+    )
+
+    $pg = Get-StatePackageGlobalMap -State $State
+    if ($null -eq $pg) { return }
+    $updated = @{}
+    foreach ($k in $pg.Keys) {
+        if ($PackageNames -notcontains [string]$k) {
+            $updated[$k] = $pg[$k]
+        }
+    }
+    $State['Package_Global'] = $updated
 }
 
 function Get-AllPackageItems {
@@ -245,6 +323,7 @@ function Update-WindotsUninstallState {
 
     $State['Selected_Packages'] = [string[]]@($finalRemaining)
     $State['Scoop_Apps'] = Get-ScoopAppsForPackageNames -PackagesDef $PackagesDef -PackageNames $State['Selected_Packages']
+    Remove-StatePackageGlobalEntries -State $State -PackageNames @($removed)
     $State['Timestamp'] = (Get-Date).ToString('s')
     return [string[]]@($removed)
 }
@@ -395,6 +474,14 @@ function Update-WindotsInstallState {
 
     $State['Selected_Packages'] = [string[]]@($finalSelected)
     $State['Scoop_Apps'] = Get-ScoopAppsForPackageNames -PackagesDef $PackagesDef -PackageNames $State['Selected_Packages']
+    $pg = Get-StatePackageGlobalMap -State $State
+    if ($null -ne $pg) {
+        $pruned = @{}
+        foreach ($n in @($State['Selected_Packages'] | ForEach-Object { [string]$_ })) {
+            if ($pg.Contains($n)) { $pruned[$n] = [bool]$pg[$n] }
+        }
+        $State['Package_Global'] = $pruned
+    }
     $State['Timestamp'] = (Get-Date).ToString('s')
 }
 
@@ -421,10 +508,10 @@ function Install-WindotsScoopApps {
     foreach ($name in $State.Scoop_Apps) {
         $pkgItem = Find-PackageItemByScoopName -PackagesDef $Ctx.Packages -ScoopName ([string]$name)
         $global = if ($pkgItem) {
-            Get-PackageInstallGlobal -PackagesDef $Ctx.Packages -PackageName ([string]$pkgItem.Name)
+            Get-PackageInstallGlobal -PackagesDef $Ctx.Packages -PackageName ([string]$pkgItem.Name) -State $State
         }
         else { $false }
-        $appResult = Install-ScoopApp -Name $name -GlobalInstall:$global -WhatIf:$Ctx.WhatIf
+        $appResult = Install-ScoopAppResolved -Name $name -TargetGlobal:$global -WhatIf:$Ctx.WhatIf
         $desc = if ($pkgItem) { Get-PackageDesc -Package $pkgItem } else { '' }
         $Results.Add([pscustomobject]@{
                 Section = 'packages'
