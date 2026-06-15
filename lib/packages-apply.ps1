@@ -11,7 +11,7 @@ function Invoke-PackageTreeWalk {
     foreach ($node in @($Nodes | Where-Object { $null -ne $_ })) {
         if ($node.Contains('Items') -and $null -ne $node.Items) {
             $gd = @($GroupDefaults)
-            if ($node.Contains('Default')) { $gd = @($GroupDefaults + @($node)) }
+            if ($node.Contains('Default') -or $node.Contains('Global')) { $gd = @($GroupDefaults + @($node)) }
             & $Visitor 'group' $node $gd
             Invoke-PackageTreeWalk -Nodes $node.Items -GroupDefaults $gd -Visitor $Visitor
         }
@@ -30,6 +30,54 @@ function Get-ResolvedPackageDefault {
     for ($i = $GroupDefaults.Count - 1; $i -ge 0; $i--) {
         $g = $GroupDefaults[$i]
         if ($g.Contains('Default')) { return [bool]$g.Default }
+    }
+    return $false
+}
+
+function Get-ResolvedPackageGlobal {
+    param(
+        [Parameter(Mandatory)] $Node,
+        [object[]]             $GroupDefaults = @()
+    )
+    if ($Node.Contains('Global')) { return [bool]$Node.Global }
+    for ($i = $GroupDefaults.Count - 1; $i -ge 0; $i--) {
+        $g = $GroupDefaults[$i]
+        if ($g.Contains('Global')) { return [bool]$g.Global }
+    }
+    return $false
+}
+
+function Get-PackageInstallGlobal {
+    param(
+        [Parameter(Mandatory)][hashtable] $PackagesDef,
+        [Parameter(Mandatory)][string]    $PackageName
+    )
+
+    $match = @{
+        Found         = $false
+        InstallGlobal = $false
+    }
+    Invoke-PackageTreeWalk -Nodes @($PackagesDef.Packages) -Visitor {
+        param($Kind, $Node, $GroupDefaults)
+        if ($Kind -ne 'package' -or $match.Found) { return }
+        if ([string]$Node.Name -ne $PackageName) { return }
+        $match.InstallGlobal = Get-ResolvedPackageGlobal -Node $Node -GroupDefaults $GroupDefaults
+        $match.Found = $true
+    }
+    return [bool]$match.InstallGlobal
+}
+
+function Test-PackageItemScoopInstalled {
+    param(
+        [Parameter(Mandatory)]            $PackageItem,
+        [Parameter(Mandatory)][hashtable] $PackagesDef
+    )
+
+    $name = [string]$PackageItem.Name
+    $global = Get-PackageInstallGlobal -PackagesDef $PackagesDef -PackageName $name
+    $apps = Get-PackageItemScoopApps -PackageItem $PackageItem
+    foreach ($app in $apps) {
+        if (Test-ScoopInstalled -Name $app -GlobalInstall:$global) { return $true }
     }
     return $false
 }
@@ -371,8 +419,12 @@ function Install-WindotsScoopApps {
 
     Write-Step (msg $StepKey)
     foreach ($name in $State.Scoop_Apps) {
-        $appResult = Install-ScoopApp -Name $name -WhatIf:$Ctx.WhatIf
         $pkgItem = Find-PackageItemByScoopName -PackagesDef $Ctx.Packages -ScoopName ([string]$name)
+        $global = if ($pkgItem) {
+            Get-PackageInstallGlobal -PackagesDef $Ctx.Packages -PackageName ([string]$pkgItem.Name)
+        }
+        else { $false }
+        $appResult = Install-ScoopApp -Name $name -GlobalInstall:$global -WhatIf:$Ctx.WhatIf
         $desc = if ($pkgItem) { Get-PackageDesc -Package $pkgItem } else { '' }
         $Results.Add([pscustomobject]@{
                 Section = 'packages'

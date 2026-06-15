@@ -5,6 +5,7 @@
 $Global:WindotsDetectionCache = @{}
 $Global:WindotsWingetList = $null
 $Global:WindotsScoopList = $null
+$Global:WindotsScoopGlobalList = $null
 $Global:WindotsBucketList = $null
 
 function Test-IsAdministrator {
@@ -31,6 +32,7 @@ function Test-CommandExists {
 function Reset-WindotsDetectionCache {
     $Global:WindotsWingetList = $null
     $Global:WindotsScoopList = $null
+    $Global:WindotsScoopGlobalList = $null
     $Global:WindotsBucketList = $null
 }
 
@@ -53,18 +55,64 @@ function Test-WingetInstalled {
     return [regex]::IsMatch($text, $pat, 'IgnoreCase,Multiline')
 }
 
-function Get-WindotsScoopList {
-    if ($null -ne $Global:WindotsScoopList) { return $Global:WindotsScoopList }
-    $map = @{}
-    if (-not (Test-CommandExists -Name 'scoop')) { $Global:WindotsScoopList = $map; return $map }
-    $out = (& scoop list *>&1 | Out-String)
-    foreach ($line in ($out -split "`r?`n")) {
-        $t = $line.Trim()
-        if (-not $t) { continue }
-        if ($t -match '^Name\s+Version' -or $t -match '^----' -or $t -match '^Installed apps') { continue }
-        $parts = $t -split '\s+', 2
-        if ($parts[0]) { $map[$parts[0].ToLowerInvariant()] = $true }
+function Get-ScoopConfigPath {
+    param(
+        [Parameter(Mandatory)][string] $Key,
+        [Parameter(Mandatory)][string] $Default
+    )
+    if (-not (Test-CommandExists -Name 'scoop')) { return $Default }
+    $value = (& scoop config $Key 2>$null | Out-String).Trim()
+    if ([string]::IsNullOrWhiteSpace($value)) { return $Default }
+    return $value
+}
+
+function Get-ScoopUserRoot {
+    if (-not [string]::IsNullOrWhiteSpace($env:SCOOP)) { return $env:SCOOP }
+    return Get-ScoopConfigPath -Key 'root_path' -Default (Join-Path $env:USERPROFILE 'scoop')
+}
+
+function Get-ScoopGlobalRoot {
+    if (-not [string]::IsNullOrWhiteSpace($env:SCOOP_GLOBAL)) { return $env:SCOOP_GLOBAL }
+    return Get-ScoopConfigPath -Key 'global_path' -Default (Join-Path $env:ProgramData 'scoop')
+}
+
+function Test-ScoopAppDirInstalled {
+    param([Parameter(Mandatory)][string] $AppDir)
+    if (Test-Path (Join-Path $AppDir 'current')) { return $true }
+    foreach ($ver in Get-ChildItem $AppDir -Directory -ErrorAction SilentlyContinue) {
+        if ([string]$ver.Name -ieq 'current') { continue }
+        if ($ver.Name -match '^_') { continue }
+        if (Test-Path (Join-Path $ver.FullName 'install.json')) { return $true }
     }
+    return $false
+}
+
+function Build-ScoopInstalledMapFromDisk {
+    param([Parameter(Mandatory)][string] $ScoopRoot)
+    $map = @{}
+    $appsDir = Join-Path $ScoopRoot 'apps'
+    if (-not (Test-Path $appsDir)) { return $map }
+    foreach ($entry in Get-ChildItem $appsDir -Directory -ErrorAction SilentlyContinue) {
+        if ([string]$entry.Name -ieq 'scoop') { continue }
+        if (Test-ScoopAppDirInstalled -AppDir $entry.FullName) {
+            $map[$entry.Name.ToLowerInvariant()] = $true
+        }
+    }
+    return $map
+}
+
+function Get-WindotsScoopList {
+    param([switch] $GlobalInstall)
+
+    if ($GlobalInstall) {
+        if ($null -ne $Global:WindotsScoopGlobalList) { return $Global:WindotsScoopGlobalList }
+        $map = Build-ScoopInstalledMapFromDisk -ScoopRoot (Get-ScoopGlobalRoot)
+        $Global:WindotsScoopGlobalList = $map
+        return $map
+    }
+
+    if ($null -ne $Global:WindotsScoopList) { return $Global:WindotsScoopList }
+    $map = Build-ScoopInstalledMapFromDisk -ScoopRoot (Get-ScoopUserRoot)
     $Global:WindotsScoopList = $map
     return $map
 }
@@ -77,9 +125,17 @@ function Get-ScoopAppBaseName {
 }
 
 function Test-ScoopInstalled {
-    param([Parameter(Mandatory)][string] $Name)
+    param(
+        [Parameter(Mandatory)][string] $Name,
+        [switch] $GlobalInstall
+    )
     $base = Get-ScoopAppBaseName -Name $Name
-    return (Get-WindotsScoopList).ContainsKey($base.ToLowerInvariant())
+    $key = $base.ToLowerInvariant()
+    if ($GlobalInstall) {
+        return (Get-WindotsScoopList -GlobalInstall).ContainsKey($key)
+    }
+    if ((Get-WindotsScoopList).ContainsKey($key)) { return $true }
+    return (Get-WindotsScoopList -GlobalInstall).ContainsKey($key)
 }
 
 function Get-WindotsBucketList {

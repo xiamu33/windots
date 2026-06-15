@@ -15,8 +15,7 @@ function Get-InteractivePackageSelection {
 
     $testPkgInstalled = {
         param($x)
-        $chk = if ($x.Contains('Packages') -and $null -ne $x.Packages) { [string](@($x.Packages)[0]) } else { [string]$x.Name }
-        Test-ScoopInstalled -Name $chk
+        Test-PackageItemScoopInstalled -PackageItem $x -PackagesDef $PackagesDef
     }
 
     $locked = @($allPackages | Where-Object { & $testPkgInstalled $_ } | ForEach-Object { [string]$_.Name })

@@ -10,12 +10,14 @@
 #   Title    - 组名或 i18n 键（优先查语言包，无则原样显示）
 #   Items    - 子节点（分组或包）
 #   Default  - 可选；子树内未声明 Default 的包继承此值
+#   Global   - 可选；子树内未声明 Global 的包继承此值（$true 时 scoop 使用 -g）
 #
 # 包节点：
 #   Name     - 菜单标识名（必填）
 #   Desc     - 可选；包描述（字符串或 @{ 'zh-CN'='...'; 'en-US'='...' }）
 #              未配置时使用 i18n/pkg.<Name>.desc
 #   Default  - 可选；覆盖分组 Default
+#   Global   - 可选；为 $true 时 scoop install/uninstall 使用 -g（全局安装）
 #   Packages - 可选；实际 scoop 安装名（字符串或数组）
 #   Dotfiles - 可选；@{ Src='...'; Dest='...' } 或数组
 #
@@ -52,21 +54,21 @@
                 }
                 @{
                     Title   = 'pkg.group.cli.plus'
-                    Default = $true
+                    Default = $false
                     Items   = @(
-                        @{ Name = 'bat' }
-                        @{ Name = 'bottom'; Default = $false }
-                        @{ Name = 'btop' }
-                        @{ Name = 'delta' }
-                        @{ Name = 'dust'; Default = $false }
-                        @{ Name = 'duf'; Default = $false }
-                        @{ Name = 'eza' }
-                        @{ Name = 'glow'; Default = $false }
+                        @{ Name = 'bat'; Default = $true }
+                        @{ Name = 'bottom' }
+                        @{ Name = 'btop'; Default = $true }
+                        @{ Name = 'delta'; Default = $true }
+                        @{ Name = 'dust' }
+                        @{ Name = 'duf' }
+                        @{ Name = 'eza'; Default = $true }
+                        @{ Name = 'glow' }
                         @{ Name = 'hyperfine' }
-                        @{ Name = 'jd'; Default = $false }
-                        @{ Name = 'lsd'; Default = $false }
-                        @{ Name = 'tealdeer'; Default = $false }
-                        @{ Name = 'tldr'; Default = $false }
+                        @{ Name = 'jd' }
+                        @{ Name = 'lsd' }
+                        @{ Name = 'tealdeer'; Default = $true }
+                        @{ Name = 'tldr' }
                     )
                 }
             )
@@ -117,8 +119,10 @@
                 @{
                     Title = 'pkg.group.dev.tools'
                     Items = @(
-                        @{ Name = 'direnv'; Default = $false }
-                        @{ Name = 'just'; Default = $false }
+                        @{ Name = 'adb' }
+                        @{ Name = 'direnv' }
+                        @{ Name = 'helm' }
+                        @{ Name = 'just' }
                         @{ Name = 'lazygit' }
                         @{
                             Name     = 'yazi'
@@ -129,12 +133,62 @@
             )
         }
         @{
-            Title   = 'pkg.group.desktop'
+            Title   = 'pkg.group.apps'
             Default = $false
+            Global  = $true
             Items   = @(
                 @{
-                    Title = 'pkg.group.desktop.wm'
+                    Title = 'pkg.group.apps.editor'
                     Items = @(
+                        @{ Name = 'apifox'; Packages = 'extras/apifox' }
+                        @{ Name = 'obsidian'; Packages = 'extras/obsidian' }
+                        @{ Name = 'trae'; Packages = 'extras/trae' }
+                        @{ Name = 'vscode'; Packages = 'extras/vscode' }
+                        @{ Name = 'zed'; Packages = 'extras/zed' }
+                    )
+                }
+                @{
+                    Title = 'pkg.group.apps.dev'
+                    Items = @(
+                        @{ Name = 'dbeaver'; Packages = 'extras/dbeaver' }
+                        @{ Name = 'rider'; Packages = 'extras/rider' }
+                        @{ Name = 'unigetui'; Packages = 'extras/unigetui' }
+                    )
+                }
+                @{
+                    Title = 'pkg.group.apps.remote'
+                    Items = @(
+                        @{ Name = 'rustdesk'; Packages = 'extras/rustdesk' }
+                        @{ Name = 'sunshine'; Packages = 'extras/sunshine' }
+                        @{ Name = 'v2rayn'; Packages = 'extras/v2rayn' }
+                    )
+                }
+                @{
+                    Title = 'pkg.group.apps.productivity'
+                    Items = @(
+                        @{ Name = 'altsnap'; Packages = 'extras/altsnap' }
+                        @{ Name = 'everything'; Packages = 'extras/everything' }
+                        @{ Name = 'everythingtoolbar'; Packages = 'extras/everythingtoolbar' }
+                        @{ Name = 'flow-launcher'; Packages = 'extras/Flow-Launcher' }
+                        @{ Name = 'InputTip'; Packages = 'abyss/abgox.InputTip-zip' }
+                        @{ Name = 'pixpin'; Packages = 'abyss/PixPin.PixPin' }
+                        @{ Name = 'powertoys'; Packages = 'extras/powertoys' }
+                    )
+                }
+                @{
+                    Title = 'pkg.group.apps.utils'
+                    Items = @(
+                        @{ Name = 'rufus'; Packages = 'extras/rufus' }
+                        @{ Name = 'steampp'; Packages = 'abyss/BeyondDimension.Steampp' }
+                        @{ Name = 'windirstat'; Packages = 'extras/windirstat' }
+                        @{ Name = 'wsl-dashboard'; Packages = 'abyss/owu.wsl-dashboard' }
+                        @{ Name = 'wsl-ui'; Packages = 'abyss/OctasoftLtd.WSLUI' }
+                    )
+                }
+                @{
+                    Title  = 'pkg.group.apps.wm'
+                    Global = $false
+                    Items  = @(
                         @{
                             Name     = 'glazewm'
                             Dotfiles = @{ Src = 'dotfiles/glazewm/config.yaml'; Dest = 'HOME\.glzr\glazewm\config.yaml' }
@@ -143,11 +197,7 @@
                             Name     = 'komorebi'
                             Packages = @('komorebi', 'whkd')
                         }
-                    )
-                }
-                @{
-                    Title = 'pkg.group.desktop.bar'
-                    Items = @(
+                        @{ Name = 'tacky-borders'; Packages = 'extras/tacky-borders' }
                         @{
                             Name     = 'yasb'
                             Dotfiles = @(
@@ -161,19 +211,6 @@
                         }
                     )
                 }
-                @{ Name = 'tacky-borders'; Packages = 'extras/tacky-borders' }
-            )
-        }
-        @{
-            Title   = 'pkg.group.win'
-            Default = $false
-            Items   = @(
-                @{ Name = 'altsnap'; Packages = 'extras/altsnap' }
-                @{ Name = 'everything'; Packages = 'extras/everything'; Default = $false }
-                @{ Name = 'everythingtoolbar'; Packages = 'extras/everythingtoolbar'; Default = $false }
-                @{ Name = 'flow-launcher'; Packages = 'extras/Flow-Launcher' }
-                @{ Name = 'InputTip'; Packages = 'abyss/abgox.InputTip-zip' }
-                @{ Name = 'powertoys' }
             )
         }
         @{

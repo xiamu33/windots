@@ -169,23 +169,44 @@ function Install-ScoopBuckets {
     return (New-ScoopStepResult -Status 'ok' -Detail (msg 'summary.detail.bucket.ok' $added))
 }
 
+function Get-ScoopSudoInvokePrefix {
+    if (Test-IsAdministrator) { return '' }
+    if (-not (Test-ScoopInstalled -Name 'sudo')) { return $null }
+    $sudoScript = Join-Path (Get-ScoopUserRoot) 'apps\sudo\current\sudo.ps1'
+    if (-not (Test-Path -LiteralPath $sudoScript)) { return $null }
+    $safe = $sudoScript.Replace("'", "''")
+    return "& '$safe' "
+}
+
 function Install-ScoopApp {
     param(
         [Parameter(Mandatory)][string] $Name,
+        [switch] $GlobalInstall,
         [switch] $WhatIf
     )
     $displayName = Get-ScoopAppBaseName -Name $Name
-    if (Test-ScoopInstalled -Name $Name) {
+    if (Test-ScoopInstalled -Name $Name -GlobalInstall:$GlobalInstall) {
         Write-Success (msg 'scoop.app.installed' $displayName)
         return (New-ScoopStepResult -Status 'skipped' -Detail (msg 'summary.detail.app.skip'))
     }
+    $sudoPrefix = ''
+    if ($GlobalInstall -and -not (Test-IsAdministrator)) {
+        $sudoPrefix = Get-ScoopSudoInvokePrefix
+        if ($null -eq $sudoPrefix) {
+            Write-Err (msg 'scoop.global.admin.err' $displayName)
+            return (New-ScoopStepResult -Status 'failed' -Detail (msg 'summary.detail.scoop.global.admin'))
+        }
+    }
     if ($WhatIf) {
-        Write-Plan "[WhatIf] scoop install $Name"
+        $flag = if ($GlobalInstall) { '-g ' } else { '' }
+        $sudoLabel = if ($sudoPrefix) { 'sudo ' } else { '' }
+        Write-Plan "[WhatIf] ${sudoLabel}scoop install ${flag}$Name"
         return (New-ScoopStepResult -Status 'ok' -Detail (msg 'summary.detail.whatif'))
     }
-    Write-Info (msg 'scoop.app.installing' $displayName)
+    Write-Info (msg $(if ($sudoPrefix) { 'scoop.global.using.sudo' } else { 'scoop.app.installing' }) $displayName)
     $safeName = $Name.Replace("'", "''")
-    $run = Invoke-CapturedPwshCommand -Command "scoop install '$safeName'"
+    $globalFlag = if ($GlobalInstall) { '-g ' } else { '' }
+    $run = Invoke-CapturedPwshCommand -Command "${sudoPrefix}scoop install ${globalFlag}'$safeName'"
     if ($run.ExitCode -ne 0) {
         $rawErr = Get-CommandOutputError -Output $run.Output
         if ([string]::IsNullOrWhiteSpace($rawErr)) {
@@ -195,6 +216,12 @@ function Install-ScoopApp {
         return (New-ScoopStepResult -Status 'failed' -Detail $rawErr)
     }
     $Global:WindotsScoopList = $null
+    $Global:WindotsScoopGlobalList = $null
+    $outputText = ($run.Output -join "`n")
+    if ($outputText -match 'already installed') {
+        Write-Success (msg 'scoop.app.installed' $displayName)
+        return (New-ScoopStepResult -Status 'skipped' -Detail (msg 'summary.detail.app.skip'))
+    }
     Write-Success (msg 'scoop.app.ok' $displayName)
     return (New-ScoopStepResult -Status 'ok' -Detail (msg 'summary.detail.app.ok'))
 }
@@ -202,20 +229,32 @@ function Install-ScoopApp {
 function Uninstall-ScoopApp {
     param(
         [Parameter(Mandatory)][string] $Name,
+        [switch] $GlobalInstall,
         [switch] $WhatIf
     )
     $displayName = Get-ScoopAppBaseName -Name $Name
-    if (-not (Test-ScoopInstalled -Name $Name)) {
+    if (-not (Test-ScoopInstalled -Name $Name -GlobalInstall:$GlobalInstall)) {
         Write-Warn (msg 'scoop.app.not.installed' $displayName)
         return (New-ScoopStepResult -Status 'skipped' -Detail (msg 'summary.detail.app.not.installed'))
     }
+    $sudoPrefix = ''
+    if ($GlobalInstall -and -not (Test-IsAdministrator)) {
+        $sudoPrefix = Get-ScoopSudoInvokePrefix
+        if ($null -eq $sudoPrefix) {
+            Write-Err (msg 'scoop.global.admin.err' $displayName)
+            return (New-ScoopStepResult -Status 'failed' -Detail (msg 'summary.detail.scoop.global.admin'))
+        }
+    }
     if ($WhatIf) {
-        Write-Plan "[WhatIf] scoop uninstall $Name"
+        $flag = if ($GlobalInstall) { '-g ' } else { '' }
+        $sudoLabel = if ($sudoPrefix) { 'sudo ' } else { '' }
+        Write-Plan "[WhatIf] ${sudoLabel}scoop uninstall ${flag}$Name"
         return (New-ScoopStepResult -Status 'ok' -Detail (msg 'summary.detail.whatif'))
     }
-    Write-Info (msg 'scoop.app.uninstalling' $displayName)
+    Write-Info (msg $(if ($sudoPrefix) { 'scoop.global.using.sudo' } else { 'scoop.app.uninstalling' }) $displayName)
     $safeName = $Name.Replace("'", "''")
-    $run = Invoke-CapturedPwshCommand -Command "scoop uninstall '$safeName'"
+    $globalFlag = if ($GlobalInstall) { '-g ' } else { '' }
+    $run = Invoke-CapturedPwshCommand -Command "${sudoPrefix}scoop uninstall ${globalFlag}'$safeName'"
     if ($run.ExitCode -ne 0) {
         $rawErr = Get-CommandOutputError -Output $run.Output
         if ([string]::IsNullOrWhiteSpace($rawErr)) {
@@ -225,6 +264,7 @@ function Uninstall-ScoopApp {
         return (New-ScoopStepResult -Status 'failed' -Detail $rawErr)
     }
     $Global:WindotsScoopList = $null
+    $Global:WindotsScoopGlobalList = $null
     Write-Success (msg 'scoop.app.uninstalled' $displayName)
     return (New-ScoopStepResult -Status 'ok' -Detail (msg 'summary.detail.app.uninstalled'))
 }
