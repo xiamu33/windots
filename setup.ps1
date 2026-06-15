@@ -133,6 +133,7 @@ switch ($cmd) {
             exit 1
         }
         $plan = Invoke-InteractivePackages -Ctx $ctx -State $state
+        if ($null -eq $plan) { exit 0 }
         Invoke-Install -Ctx $ctx -Plan $plan
         exit 0
     }
@@ -151,6 +152,7 @@ switch ($cmd) {
     'init' {
         if (-not $state -or $Reconfigure) {
             $state = Invoke-Interactive -Ctx $ctx
+            if ($null -eq $state) { exit 0 }
         }
         else {
             Clear-Host
@@ -173,6 +175,7 @@ switch ($cmd) {
             $useSaved = Read-YesNo -Prompt (msg 'setup.state.use.prompt') -Default $true
             if (-not $useSaved) {
                 $state = Invoke-Interactive -Ctx $ctx
+                if ($null -eq $state) { exit 0 }
             }
         }
         Invoke-Init -Ctx $ctx -State $state

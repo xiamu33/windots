@@ -100,6 +100,8 @@ function Get-InteractivePackageSelection {
     else { $selectParams['NotInstalled'] = $notInstalled }
 
     $allSelected = Select-Items @selectParams
+    if ($null -eq $allSelected) { return $null }
+
     $selectedPkgNames = [string[]]@($allSelected | ForEach-Object { [string]$_.Name } | Select-Object -Unique)
 
     $scoopAppsList = [System.Collections.Generic.List[string]]::new()
@@ -134,6 +136,10 @@ function Invoke-InteractivePackages {
 
     Write-Step (msg 'interactive.step.packages')
     $selection = Get-InteractivePackageSelection -PackagesDef $pkg -SavedSelected $savedSelected
+    if ($null -eq $selection) {
+        Write-Info (msg 'interactive.cancelled')
+        return $null
+    }
 
     $newNames = [string[]]@($selection.SelectedPkgNames | Where-Object { $savedSelected -notcontains $_ })
 
@@ -190,6 +196,15 @@ function Invoke-InteractivePackagesUninstall {
 
     Write-Step (msg 'uninstall.interactive.step.packages')
     $selection = Get-InteractivePackageSelection -PackagesDef $pkg -SavedSelected $savedSelected -Mode 'uninstall'
+    if ($null -eq $selection) {
+        Write-Info (msg 'interactive.cancelled')
+        return [pscustomobject]@{
+            State                = $State
+            RemovedPackages      = @()
+            ScoopAppsToUninstall = @()
+            BlockedApps          = @()
+        }
+    }
 
     $removedNames = [string[]]@($selection.SelectedPkgNames | ForEach-Object { [string]$_ })
     if (@($removedNames).Count -eq 0) {
@@ -281,6 +296,10 @@ function Invoke-Interactive {
         -Labeler { param($x) $x.Name } `
         -DefaultSet { param($x) [bool]$x.Default } `
         -Disabled   $disabledPM
+    if ($null -eq $selectedPM) {
+        Write-Info (msg 'interactive.cancelled')
+        return $null
+    }
 
     $useScoop = ($selectedPM | Where-Object { $_.Key -eq 'scoop' }).Count -gt 0
 
@@ -299,6 +318,10 @@ function Invoke-Interactive {
     # ------------------------------------------------------------------
     Write-Step (msg 'interactive.step.packages')
     $selection = Get-InteractivePackageSelection -PackagesDef $pkg
+    if ($null -eq $selection) {
+        Write-Info (msg 'interactive.cancelled')
+        return $null
+    }
     $selectedPkgNames = $selection.SelectedPkgNames
     $scoopApps = $selection.ScoopApps
 

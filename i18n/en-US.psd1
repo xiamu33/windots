@@ -152,6 +152,7 @@
 
     # --- Interactive ---
     'interactive.title'                  = '=== Windots Interactive Setup ==='
+    'interactive.cancelled'              = 'Operation cancelled.'
     'interactive.repo'                   = 'Repo directory: {0}'
     'interactive.log'                    = 'Log file: {0}'
     'interactive.step.proxy'             = '--- 1/6 Proxy Configuration ---'

@@ -152,6 +152,7 @@
 
     # --- 交互配置 ---
     'interactive.title'                    = '=== Windots 交互配置 ==='
+    'interactive.cancelled'                = '已取消操作。'
     'interactive.repo'                     = '仓库目录：{0}'
     'interactive.log'                      = '日志文件：{0}'
     'interactive.step.proxy'               = '--- 1/6 代理配置 ---'

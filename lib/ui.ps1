@@ -686,7 +686,7 @@ function Select-Items {
                 }
                 return @($result)
             }
-            'Escape' { return @() }
+            'Escape' { return $null }
         }
     }
 }
@@ -1126,7 +1126,9 @@ function Test-ScoopAppHiddenInTable {
 function Write-PackageList {
     param(
         [Parameter(Mandatory)][string]   $TitleKey,
-        [Parameter(Mandatory)][string[]] $SelectedNames,
+        [Parameter(Mandatory)]
+        [AllowEmptyCollection()]
+        [string[]]                       $SelectedNames,
         [string[]]                       $ScoopApps = @(),
         [Parameter(Mandatory)]             $PackagesDef
     )
