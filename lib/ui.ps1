@@ -265,7 +265,7 @@ function Select-Items {
     for ($i = 0; $i -lt $Items.Count; $i++) { $initialSelected[$i] = $selected[$i] }
     $collapsedGroups = @{}
     $hideLocked = $false
-    $hasLockedPackages = @($Locked | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }).Count -gt 0
+    $hasHideableRows = @($Locked + $NotInstalled | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique).Count -gt 0
 
     $globalTagEnabled = $GlobalToggle -or $GlobalReadOnly
     $globalFlags = New-Object 'bool[]' $Items.Count
@@ -298,16 +298,16 @@ function Select-Items {
     $cursorColor = $script:WindotsMenuCursorColor
     $headerLines = if ($Grouped) { 4 } else { 3 }
 
-    $isRowLockedPkg = {
+    $isRowHideable = {
         param([int] $Idx)
         if (-not (& $isPkgRow $Items[$Idx])) { return $false }
         $lbl = & $Labeler $Items[$Idx]
-        return $Locked -contains $lbl
+        return ($Locked -contains $lbl) -or ($NotInstalled -contains $lbl)
     }
 
     $isRowVisible = {
         param([int] $Idx)
-        if ($hideLocked -and $hasLockedPackages -and (& $isRowLockedPkg $Idx)) { return $false }
+        if ($hideLocked -and $hasHideableRows -and (& $isRowHideable $Idx)) { return $false }
         if (-not $Grouped) { return $true }
         $anc = $Items[$Idx].AncestorGroupRowIndices
         if ($null -eq $anc -or @($anc).Count -eq 0) { return $true }
@@ -720,10 +720,10 @@ function Select-Items {
         if ($selectedCount -gt 0) {
             Write-Host -NoNewline (msg 'ui.select.selected.count' $selectedCount) -ForegroundColor $cursorColor
         }
-        if ($hideLocked -and $hasLockedPackages) {
+        if ($hideLocked -and $hasHideableRows) {
             $hiddenLockedCount = 0
             for ($hi = 0; $hi -lt $Items.Count; $hi++) {
-                if (& $isRowLockedPkg $hi) { $hiddenLockedCount++ }
+                if (& $isRowHideable $hi) { $hiddenLockedCount++ }
             }
             Write-Host -NoNewline (msg 'ui.select.locked.hidden' $hiddenLockedCount) -ForegroundColor DarkGray
         }
@@ -863,7 +863,7 @@ function Select-Items {
                 }
             }
             'H' {
-                if ($hasLockedPackages) { $hideLocked = -not $hideLocked }
+                if ($hasHideableRows) { $hideLocked = -not $hideLocked }
             }
             'Enter' {
                 if ($GlobalToggle -and $PSBoundParameters.ContainsKey('GlobalMapOut') -and $null -ne $GlobalMapOut) {
