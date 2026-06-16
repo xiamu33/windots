@@ -117,7 +117,14 @@ function Get-InteractivePackageSelection {
             Test-PackageItemScoopInstalledAnyScope -PackageItem $row.Package
         }
     }
-    else { $selectParams['NotInstalled'] = $notInstalled }
+    else {
+        $selectParams['NotInstalled'] = $notInstalled
+        $selectParams['GlobalReadOnly'] = $true
+        $selectParams['GlobalSet'] = {
+            param($row)
+            Test-PackageItemScoopInstalledAtScope -PackageItem $row.Package -InstallGlobal $true
+        }
+    }
 
     $allSelected = Select-Items @selectParams
     if ($null -eq $allSelected) { return $null }

@@ -239,6 +239,7 @@ function Select-Items {
         [switch]      $Grouped,
         [string]      $HintKey = 'ui.select.hint',
         [switch]      $GlobalToggle,
+        [switch]      $GlobalReadOnly,
         [scriptblock] $GlobalSet = $null,
         [ref]         $GlobalMapOut,
         [scriptblock] $InstalledChecker = $null,
@@ -264,8 +265,9 @@ function Select-Items {
     for ($i = 0; $i -lt $Items.Count; $i++) { $initialSelected[$i] = $selected[$i] }
     $collapsedGroups = @{}
 
+    $globalTagEnabled = $GlobalToggle -or $GlobalReadOnly
     $globalFlags = New-Object 'bool[]' $Items.Count
-    if ($GlobalToggle) {
+    if ($globalTagEnabled) {
         $setGlobal = if ($GlobalSet) { $GlobalSet } else { { param($x) $false } }
         for ($i = 0; $i -lt $Items.Count; $i++) {
             if (& $isGroupRow $Items[$i]) { continue }
@@ -276,11 +278,17 @@ function Select-Items {
     $installedTag = msg 'ui.select.installed'
     $notInstalledTag = msg 'ui.select.not.installed'
     $unsupportedTag = msg 'ui.select.unsupported'
-    $globalTag = if ($GlobalToggle) { msg 'ui.select.global' } else { '' }
+    $globalTag = if ($globalTagEnabled) { msg 'ui.select.global' } else { '' }
     $globalTagColor = [ConsoleColor]::DarkYellow
     if ($Grouped) {
         $hintMove = msg 'ui.select.tree.hint.move'
-        $hintSelect = msg 'ui.select.tree.hint.select'
+        $hintSelectKey = if ($GlobalReadOnly -and -not $GlobalToggle) {
+            'ui.select.tree.hint.select.noglobal'
+        }
+        else {
+            'ui.select.tree.hint.select'
+        }
+        $hintSelect = msg $hintSelectKey
     }
     else {
         $hint = msg $HintKey
@@ -389,28 +397,39 @@ function Select-Items {
 
     $writePkgTags = {
         param(
-            [int]    $Idx,
-            [bool]   $ShowInstalled,
-            [string] $LineText,
-            [ConsoleColor] $LineColor,
-            [string] $Suffix = '',
-            [ConsoleColor] $SuffixColor = [ConsoleColor]::DarkCyan
+            [string]         $LineText,
+            [ConsoleColor]   $LineColor,
+            [string]         $Suffix = '',
+            [ConsoleColor]   $SuffixColor = [ConsoleColor]::DarkCyan,
+            [string]         $StatusTag = '',
+            [ConsoleColor]   $StatusTagColor = [ConsoleColor]::DarkGray,
+            [bool]           $ShowGlobal = $false
         )
-        $fullWidth = Get-DisplayWidth ($LineText + $Suffix)
-        Write-Host -NoNewline $LineText -ForegroundColor $LineColor
-        if ($Suffix) { Write-Host -NoNewline $Suffix -ForegroundColor $SuffixColor }
-        if ($tagBaseWidth -gt 0) {
-            Write-Host -NoNewline (' ' * [Math]::Max(0, ($tagBaseWidth - $fullWidth))) -ForegroundColor $LineColor
+        if ($tagAreaStart -le 0) {
+            Write-Host -NoNewline $LineText -ForegroundColor $LineColor
+            if ($Suffix) { Write-Host $Suffix -ForegroundColor $SuffixColor }
+            else { Write-Host '' }
+            return
         }
-        else {
-            Write-Host -NoNewline '  ' -ForegroundColor $LineColor
+        $line = [string]$LineText
+        $sfx = [string]$Suffix
+        $contentW = (Get-DisplayWidth $line) + (Get-DisplayWidth $sfx)
+        if ($contentW -gt $tagAreaStart) {
+            $line = Truncate-DisplayText -Text ($line + $sfx) -Width $tagAreaStart
+            $sfx = ''
+            $contentW = Get-DisplayWidth $line
         }
-        if ($ShowInstalled) {
-            Write-Host -NoNewline $installedTag -ForegroundColor DarkGreen
+        $pad = $tagAreaStart - $contentW
+        Write-Host -NoNewline $line -ForegroundColor $LineColor
+        if ($sfx) { Write-Host -NoNewline $sfx -ForegroundColor $SuffixColor }
+        if ($pad -gt 0) { Write-Host -NoNewline (' ' * $pad) -ForegroundColor $LineColor }
+        if ($globalColWidth -gt 0) {
+            if ($ShowGlobal) { Write-Host -NoNewline $globalTag -ForegroundColor $globalTagColor }
+            $gRem = $globalColWidth - $(if ($ShowGlobal) { Get-DisplayWidth $globalTag } else { 0 })
+            if ($gRem -gt 0) { Write-Host -NoNewline (' ' * $gRem) -ForegroundColor $LineColor }
+            Write-Host -NoNewline ' ' -ForegroundColor $LineColor
         }
-        if ($GlobalToggle -and $globalFlags[$Idx]) {
-            Write-Host -NoNewline $globalTag -ForegroundColor $globalTagColor
-        }
+        if ($StatusTag) { Write-Host -NoNewline $StatusTag -ForegroundColor $StatusTagColor }
         Write-Host ''
     }
 
@@ -584,6 +603,24 @@ function Select-Items {
     $scrollTop = 0
     $firstDraw = $true
 
+    $globalColWidth = if ($globalTagEnabled) { Get-DisplayWidth $globalTag } else { 0 }
+    $maxPkgContentWidth = 0
+    for ($ti = 0; $ti -lt $Items.Count; $ti++) {
+        if (-not (& $isPkgRow $Items[$ti])) { continue }
+        $tLabel = & $Labeler $Items[$ti]
+        $tSfx = if ($SuffixLabeler) { [string](& $SuffixLabeler $Items[$ti]) } else { '' }
+        $tPrefix = if ($Grouped -and $Items[$ti].Depth -gt 0) { '  ' * [int]$Items[$ti].Depth } else { '' }
+        $tw = [Math]::Max(
+            (Get-DisplayWidth "${tPrefix}> [x] ${tLabel}${tSfx}"),
+            [Math]::Max(
+                (Get-DisplayWidth "${tPrefix}> [ ] ${tLabel}${tSfx}"),
+                (Get-DisplayWidth "${tPrefix}  [ ] ${tLabel}${tSfx}")
+            )
+        )
+        if ($tw -gt $maxPkgContentWidth) { $maxPkgContentWidth = $tw }
+    }
+    $tagAreaStart = if ($maxPkgContentWidth -gt 0) { $maxPkgContentWidth + 4 } else { 0 }
+
     while ($true) {
         $visibleRowIdx = @(& $getVisibleRowIndices)
         if ($Grouped -and ($visibleRowIdx -notcontains $cursor)) {
@@ -636,32 +673,6 @@ function Select-Items {
             Write-Host ''
         }
 
-        $installedTagBaseWidth = 0
-        $notInstalledTagWidth = Get-DisplayWidth $notInstalledTag
-        $globalTagWidth = if ($GlobalToggle) { Get-DisplayWidth $globalTag } else { 0 }
-        $installedOnlyWidth = Get-DisplayWidth $installedTag
-        $comboTagWidth = $globalTagWidth
-        if ($globalTagWidth -gt 0 -and $installedOnlyWidth -gt 0) { $comboTagWidth += $installedOnlyWidth }
-        elseif ($installedOnlyWidth -gt 0) { $comboTagWidth = $installedOnlyWidth }
-        for ($i = 0; $i -lt $Items.Count; $i++) {
-            if (& $isGroupRow $Items[$i]) { continue }
-            $label = & $Labeler $Items[$i]
-            $sfx = if ($SuffixLabeler) { [string](& $SuffixLabeler $Items[$i]) } else { '' }
-            if ($Disabled -contains $label) { continue }
-            if ($NotInstalled -contains $label) {
-                $arrow = if ($i -eq $cursor) { '>' } else { ' ' }
-                $w = Get-DisplayWidth ("$arrow [ ] $label$sfx")
-                if ($w -gt $installedTagBaseWidth) { $installedTagBaseWidth = $w }
-                continue
-            }
-            $arrow = if ($i -eq $cursor) { '>' } else { ' ' }
-            $mark = & $getRowMark $i
-            $w = Get-DisplayWidth ("$arrow [$mark] $label$sfx")
-            if ($w -gt $installedTagBaseWidth) { $installedTagBaseWidth = $w }
-        }
-        if ($installedTagBaseWidth -gt 0) { $installedTagBaseWidth += 2 }
-        $tagBaseWidth = [Math]::Max([Math]::Max($installedTagBaseWidth, $notInstalledTagWidth + 2), $comboTagWidth + 2)
-
         if ($needScroll -and $scrollTopVis -gt 0) {
             Write-Host (msg 'ui.select.scroll.up' $scrollTopVis) -ForegroundColor DarkGray
         }
@@ -687,47 +698,39 @@ function Select-Items {
             }
 
             if ($isDisabled) {
-                Write-Host ("$prefix  [ ] $label  $unsupportedTag") -ForegroundColor DarkGray
+                & $writePkgTags "$prefix  [ ] $label" ([ConsoleColor]::DarkGray) '' ([ConsoleColor]::DarkCyan) $unsupportedTag ([ConsoleColor]::DarkGray) $false
             }
             elseif ($isNotInstalled) {
-                $lineText = "$prefix$arrow [ ] $label$sfx"
-                $lineWidth = Get-DisplayWidth $lineText
                 $lineColor = if ($i -eq $cursor) { $cursorColor } else { [ConsoleColor]::DarkGray }
-                if ($tagBaseWidth -gt 0) {
-                    Write-Host -NoNewline ($lineText + (' ' * [Math]::Max(0, ($tagBaseWidth - $lineWidth)))) -ForegroundColor $lineColor
-                }
-                else {
-                    Write-Host -NoNewline $lineText -ForegroundColor $lineColor
-                    Write-Host -NoNewline '  '
-                }
-                Write-Host $notInstalledTag -ForegroundColor DarkGray
+                $showG = $globalTagEnabled -and $globalFlags[$i]
+                & $writePkgTags "$prefix$arrow [ ] $label" $lineColor $sfx ([ConsoleColor]::DarkGray) $notInstalledTag ([ConsoleColor]::DarkGray) $showG
             }
             elseif ($isLocked) {
                 $lockedText = "$prefix$arrow [x] $label"
                 $lineColor = if ($i -eq $cursor) { $cursorColor } else { [ConsoleColor]::DarkGray }
                 $suffixColor = [ConsoleColor]::DarkGray
-                & $writePkgTags $i (& $rowInstalledAtScope $i) $lockedText $lineColor $sfx $suffixColor
+                $installedAtScope = & $rowInstalledAtScope $i
+                $statusText = if ($installedAtScope) { $installedTag } else { '' }
+                $statusColor = if ($installedAtScope) { [ConsoleColor]::DarkGreen } else { [ConsoleColor]::DarkGray }
+                $showG = $globalTagEnabled -and $globalFlags[$i]
+                & $writePkgTags $lockedText $lineColor $sfx $suffixColor $statusText $statusColor $showG
             }
             elseif ($isInstalled) {
                 $itemColor = if ($selected[$i]) { [ConsoleColor]::Green } else { [ConsoleColor]::Gray }
                 $color = if ($i -eq $cursor) { $cursorColor } else { $itemColor }
                 $lineText = "$prefix$arrow [$mark] $label"
-                & $writePkgTags $i $true $lineText $color $sfx
+                $showG = $globalTagEnabled -and $globalFlags[$i]
+                & $writePkgTags $lineText $color $sfx ([ConsoleColor]::DarkCyan) $installedTag ([ConsoleColor]::DarkGreen) $showG
             }
             else {
                 $itemColor = if ($selected[$i]) { [ConsoleColor]::Green } else { [ConsoleColor]::Gray }
                 $color = if ($i -eq $cursor) { $cursorColor } else { $itemColor }
                 $lineText = "$prefix$arrow [$mark] $label"
                 $showInstalled = & $rowInstalledAtScope $i
-                $showTags = $GlobalToggle -and ($globalFlags[$i] -or $showInstalled)
-                if ($showTags) {
-                    & $writePkgTags $i $showInstalled $lineText $color $sfx
-                }
-                else {
-                    Write-Host -NoNewline $lineText -ForegroundColor $color
-                    if ($sfx) { Write-Host $sfx -ForegroundColor DarkCyan }
-                    else { Write-Host '' }
-                }
+                $statusText = if ($GlobalToggle -and $showInstalled) { $installedTag } else { '' }
+                $statusColor = [ConsoleColor]::DarkGreen
+                $showG = $globalTagEnabled -and $globalFlags[$i]
+                & $writePkgTags $lineText $color $sfx ([ConsoleColor]::DarkCyan) $statusText $statusColor $showG
             }
         }
 

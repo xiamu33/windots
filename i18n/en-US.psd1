@@ -186,6 +186,7 @@
     'interactive.packages.title'         = 'Select packages:'
     'ui.select.tree.hint.move'           = '  J/K(↓/↑) Move  D/U(→/←) Jump Group  Shift+D/U Bottom/Top Group  F Fold/Unfold  Shift+F Fold/Unfold All'
     'ui.select.tree.hint.select'         = '  Space Toggle  A/N Current Group  Shift+A/N All  G Toggle Global  Enter Confirm  Esc Cancel'
+    'ui.select.tree.hint.select.noglobal' = '  Space Toggle  A/N Current Group  Shift+A/N All  Enter Confirm  Esc Cancel'
     'interactive.step.chezmoi'           = '--- 5/6 chezmoi Config Sync ---'
     'interactive.chezmoi.prompt'         = 'Use chezmoi to sync cross-platform configs (nvim/starship/wezterm etc.)?'
     'interactive.chezmoi.user.prompt'    = 'GitHub username or repo URL'
