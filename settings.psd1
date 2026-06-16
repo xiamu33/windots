@@ -20,8 +20,11 @@
 
     # ------------------------------------------------------------------
     # Scoop
-    # MirrorUrl：国内镜像安装脚本
-    # GiteeRepo：镜像模式下 scoop config SCOOP_REPO 的目标地址
+    # MirrorUrl：国内镜像安装脚本（UseMirror 为 $true 时使用）
+    # SetConfig：scoop config 键值（安装后自动写入未设置的项）
+    #   ROOT_PATH / root_path   → scoop 用户安装目录
+    #   GLOBAL_PATH / global_path → scoop 全局安装目录
+    #   SCOOP_REPO              → scoop 仓库镜像地址
     # Buckets：额外 bucket 列表（scoop 安装时默认仅含 main）
     #   - 字符串：bucket 名称，如 'extras'（使用 scoop 默认源）
     #   - 对象：@{ Name = 'mybucket'; Url = 'https://...' }
@@ -29,7 +32,11 @@
     Scoop      = @{
         UseMirror = $true
         MirrorUrl = 'https://gitee.com/scoop-installer/install/raw/master/install.ps1'
-        GiteeRepo = 'https://gitee.com/scoop-installer/scoop'
+        SetConfig = @{
+            ROOT_PATH   = 'C:\Users\xiamu\scoop'
+            GLOBAL_PATH = 'C:\ProgramData\scoop'
+            SCOOP_REPO  = 'https://gitee.com/scoop-installer/scoop'
+        }
         Buckets   = @(
             'extras',
             'nerd-fonts',

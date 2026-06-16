@@ -32,6 +32,17 @@ function Invoke-Init {
             })
     }
 
+    if ((Test-CommandExists -Name 'scoop') -or $Ctx.WhatIf) {
+        Write-Step (msg 'init.step.scoop.config')
+        $configResult = Apply-ScoopSetConfig -ScoopConfig $Ctx.Settings.Scoop -WhatIf:$Ctx.WhatIf
+        $results.Add([pscustomobject]@{
+                Section = 'scoop'
+                Label   = (msg 'summary.label.scoop.config')
+                Status  = [string]$configResult.Status
+                Detail  = [string]$configResult.Detail
+            })
+    }
+
     if ([bool]$State.Scoop_Mirror -and ((Test-CommandExists -Name 'scoop') -or $Ctx.WhatIf)) {
         Write-Step (msg 'init.step.mirror')
         $mirrorResult = Switch-ScoopMirror -ScoopConfig $Ctx.Settings.Scoop -WhatIf:$Ctx.WhatIf

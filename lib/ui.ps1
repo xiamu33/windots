@@ -4,29 +4,67 @@
 
 # 丢弃启动阶段或输出期间误触的按键，避免 Read-Host / ReadKey 直接消费缓冲输入
 $script:WindotsConsoleInputFlush = $false
-$script:WindotsLastCtrlC = [DateTime]::MinValue
+$script:WindotsConsoleCancelLoaded = $false
 $script:WindotsConsoleInputInit = $false
 $script:WindotsMenuCursorColor = [ConsoleColor]::Red
 
+function Initialize-WindotsConsoleCancelType {
+    if ($script:WindotsConsoleCancelLoaded -and ('WindotsConsoleCancel' -as [type])) { return }
+    if (-not ('WindotsConsoleCancel' -as [type])) {
+        Add-Type -TypeDefinition @'
+using System;
+
+public static class WindotsConsoleCancel {
+    static DateTime LastCtrlC = DateTime.MinValue;
+    static string Hint = "Press Ctrl+C again to exit";
+    const int WindowMs = 800;
+
+    public static void SetHint(string hint) {
+        if (!string.IsNullOrEmpty(hint)) { Hint = hint; }
+    }
+
+    public static void Reset() {
+        LastCtrlC = DateTime.MinValue;
+    }
+
+    static void OnSignal() {
+        var now = DateTime.UtcNow;
+        if ((now - LastCtrlC).TotalMilliseconds <= WindowMs) {
+            Environment.Exit(130);
+        }
+        LastCtrlC = now;
+        try {
+            Console.WriteLine();
+            Console.WriteLine(Hint);
+        }
+        catch { }
+    }
+
+    public static void OnCancel(object sender, ConsoleCancelEventArgs e) {
+        e.Cancel = true;
+        OnSignal();
+    }
+
+    public static void OnReadKey() {
+        OnSignal();
+    }
+}
+'@ -ErrorAction Stop
+    }
+    if (-not ('WindotsConsoleCancel' -as [type])) {
+        throw [InvalidOperationException]::new('Failed to load WindotsConsoleCancel type.')
+    }
+    $script:WindotsConsoleCancelLoaded = $true
+}
+
 function Initialize-WindotsConsoleInput {
+    Initialize-WindotsConsoleCancelType
+    [WindotsConsoleCancel]::SetHint('Press Ctrl+C again to exit')
     if ($script:WindotsConsoleInputInit) { return }
     $script:WindotsConsoleInputInit = $true
     try { [Console]::TreatControlCAsInput = $true } catch { }
     try {
-        $handler = [ConsoleCancelEventHandler] {
-            param($sender, $e)
-            $e.Cancel = $true
-            $now = [DateTime]::UtcNow
-            if (($now - $script:WindotsLastCtrlC).TotalMilliseconds -le 800) {
-                exit 130
-            }
-            $script:WindotsLastCtrlC = $now
-            [Console]::WriteLine('')
-            if (Get-Command -Name msg -ErrorAction SilentlyContinue) {
-                Write-Warn (msg 'ui.ctrlc.hint')
-            }
-        }
-        [Console]::add_CancelKeyPress($handler)
+        [Console]::add_CancelKeyPress([ConsoleCancelEventHandler][WindotsConsoleCancel]::OnCancel)
     }
     catch { }
 }
@@ -37,13 +75,8 @@ function Test-CtrlCKey {
 }
 
 function Invoke-CtrlCExitCheck {
-    $now = [DateTime]::UtcNow
-    if (($now - $script:WindotsLastCtrlC).TotalMilliseconds -le 800) {
-        exit 130
-    }
-    $script:WindotsLastCtrlC = $now
-    [Console]::WriteLine('')
-    Write-Warn (msg 'ui.ctrlc.hint')
+    Initialize-WindotsConsoleCancelType
+    [WindotsConsoleCancel]::OnReadKey()
 }
 
 function Read-MenuKey {
@@ -54,7 +87,7 @@ function Read-MenuKey {
             Invoke-CtrlCExitCheck
             continue
         }
-        $script:WindotsLastCtrlC = [DateTime]::MinValue
+        [WindotsConsoleCancel]::Reset()
         return $key
     }
 }
@@ -95,6 +128,7 @@ function Read-YesNo {
         [Parameter(Mandatory)][string] $Prompt,
         [bool] $Default = $true
     )
+    Initialize-WindotsConsoleInput
     $suffix = if ($Default) { '[Y/n]' } else { '[y/N]' }
     while ($true) {
         Clear-ConsoleInputBuffer
@@ -113,6 +147,7 @@ function Read-Text {
         [Parameter(Mandatory)][string] $Prompt,
         [string] $Default = ''
     )
+    Initialize-WindotsConsoleInput
     $shown = if ($Default) { msg 'ui.text.default' $Prompt $Default } else { $Prompt }
     Clear-ConsoleInputBuffer
     $answer = Read-Host $shown
@@ -1345,7 +1380,7 @@ function Write-PackageList {
         [string[]]                       $SelectedNames,
         [string[]]                       $ScoopApps = @(),
         [Parameter(Mandatory)]             $PackagesDef,
-        [hashtable]                      $PackageGlobal = $null,
+        [string[]]                       $PackageGlobal = @(),
         $State = $null
     )
 
@@ -1361,12 +1396,12 @@ function Write-PackageList {
         })
 
     $resolveState = $State
-    if ($null -ne $PackageGlobal) {
-        $resolveState = @{ Package_Global = $PackageGlobal }
+    if ($PackageGlobal.Count -gt 0) {
+        $resolveState = @{ Package_Global = @($PackageGlobal) }
     }
-
-    Write-Plan (msg 'interactive.plan.scoop.root' (Format-ScoopPathDisplay -Scope 'user'))
-    Write-Plan (msg 'interactive.plan.scoop.global_path' (Format-ScoopPathDisplay -Scope 'global'))
+    elseif ($null -eq $resolveState) {
+        $resolveState = @{}
+    }
 
     $tableWidth = Get-PackageTableWidth
 

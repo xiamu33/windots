@@ -47,10 +47,10 @@ function Get-ResolvedPackageGlobal {
     return $false
 }
 
-function Get-StatePackageGlobalMap {
+function Get-StatePackageGlobalNames {
     param($State)
 
-    if ($null -eq $State) { return $null }
+    if ($null -eq $State) { return @() }
     $pg = $null
     if ($State -is [hashtable] -and $State.Contains('Package_Global')) {
         $pg = $State['Package_Global']
@@ -58,8 +58,12 @@ function Get-StatePackageGlobalMap {
     elseif ($null -ne $State.PSObject.Properties['Package_Global']) {
         $pg = $State.Package_Global
     }
-    if ($null -eq $pg -or $pg -isnot [hashtable]) { return $null }
-    return $pg
+    if ($null -eq $pg) { return @() }
+
+    if ($pg -is [hashtable]) {
+        return @($pg.Keys | Where-Object { [bool]$pg[$_] } | ForEach-Object { [string]$_ })
+    }
+    return @($pg | ForEach-Object { [string]$_ } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
 }
 
 function Get-PackageInstallGlobal {
@@ -69,10 +73,8 @@ function Get-PackageInstallGlobal {
         $State = $null
     )
 
-    $pg = Get-StatePackageGlobalMap -State $State
-    if ($null -ne $pg -and $pg.Contains($PackageName)) {
-        return [bool]$pg[$PackageName]
-    }
+    $globalNames = Get-StatePackageGlobalNames -State $State
+    if ($globalNames -contains $PackageName) { return $true }
 
     $match = @{
         Found         = $false
@@ -127,20 +129,29 @@ function Set-StatePackageGlobal {
         [Parameter(Mandatory)]
         [AllowEmptyCollection()]
         [string[]]                             $SelectedNames,
-        [hashtable]                            $PackageGlobalMap,
+        [hashtable]                            $PackageGlobalMap = $null,
         [Parameter(Mandatory)][hashtable]      $PackagesDef
     )
 
-    $pg = @{}
+    $globalNames = [System.Collections.Generic.List[string]]::new()
     foreach ($n in @($SelectedNames | ForEach-Object { [string]$_ })) {
+        $isGlobal = $false
         if ($null -ne $PackageGlobalMap -and $PackageGlobalMap.Contains($n)) {
-            $pg[$n] = [bool]$PackageGlobalMap[$n]
+            $isGlobal = [bool]$PackageGlobalMap[$n]
         }
         else {
-            $pg[$n] = Get-PackageInstallGlobal -PackagesDef $PackagesDef -PackageName $n -State $State
+            $isGlobal = Get-PackageInstallGlobal -PackagesDef $PackagesDef -PackageName $n -State $State
+        }
+        if ($isGlobal -and -not $globalNames.Contains($n)) { [void]$globalNames.Add($n) }
+    }
+    if ($globalNames.Count -eq 0) {
+        if ($State -is [hashtable] -and $State.Contains('Package_Global')) {
+            $State.Remove('Package_Global')
         }
     }
-    $State['Package_Global'] = $pg
+    else {
+        $State['Package_Global'] = [string[]]@($globalNames)
+    }
 }
 
 function Remove-StatePackageGlobalEntries {
@@ -149,15 +160,17 @@ function Remove-StatePackageGlobalEntries {
         [Parameter(Mandatory)][string[]] $PackageNames
     )
 
-    $pg = Get-StatePackageGlobalMap -State $State
-    if ($null -eq $pg) { return }
-    $updated = @{}
-    foreach ($k in $pg.Keys) {
-        if ($PackageNames -notcontains [string]$k) {
-            $updated[$k] = $pg[$k]
+    $names = Get-StatePackageGlobalNames -State $State
+    if ($names.Count -eq 0) { return }
+    $updated = @($names | Where-Object { $PackageNames -notcontains [string]$_ })
+    if ($updated.Count -eq 0) {
+        if ($State -is [hashtable] -and $State.Contains('Package_Global')) {
+            $State.Remove('Package_Global')
         }
     }
-    $State['Package_Global'] = $updated
+    else {
+        $State['Package_Global'] = $updated
+    }
 }
 
 function Get-AllPackageItems {
@@ -474,13 +487,15 @@ function Update-WindotsInstallState {
 
     $State['Selected_Packages'] = [string[]]@($finalSelected)
     $State['Scoop_Apps'] = Get-ScoopAppsForPackageNames -PackagesDef $PackagesDef -PackageNames $State['Selected_Packages']
-    $pg = Get-StatePackageGlobalMap -State $State
-    if ($null -ne $pg) {
-        $pruned = @{}
-        foreach ($n in @($State['Selected_Packages'] | ForEach-Object { [string]$_ })) {
-            if ($pg.Contains($n)) { $pruned[$n] = [bool]$pg[$n] }
+    $globalNames = Get-StatePackageGlobalNames -State $State
+    if ($globalNames.Count -gt 0) {
+        $pruned = @($globalNames | Where-Object { $State['Selected_Packages'] -contains [string]$_ })
+        if ($pruned.Count -eq 0) {
+            if ($State.Contains('Package_Global')) { $State.Remove('Package_Global') }
         }
-        $State['Package_Global'] = $pruned
+        else {
+            $State['Package_Global'] = $pruned
+        }
     }
     $State['Timestamp'] = (Get-Date).ToString('s')
 }

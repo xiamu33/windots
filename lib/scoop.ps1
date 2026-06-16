@@ -44,6 +44,160 @@ function Get-ScoopConfigValue {
     return $Default
 }
 
+function Resolve-ScoopSetConfigKey {
+    param([Parameter(Mandatory)][string] $Key)
+    $k = $Key.Trim()
+    switch -Regex ($k) {
+        '^(?i)root_path$' { return 'root_path' }
+        '^(?i)global_path$' { return 'global_path' }
+        '^(?i)scoop_repo$' { return 'SCOOP_REPO' }
+        default { return $k }
+    }
+}
+
+function Get-ScoopSetConfigFromSettings {
+    param($ScoopConfig)
+
+    $result = @{}
+    if ($null -eq $ScoopConfig) { return $result }
+    if (-not ($ScoopConfig -is [System.Collections.IDictionary]) -or -not $ScoopConfig.Contains('SetConfig')) {
+        return $result
+    }
+    $raw = $ScoopConfig.SetConfig
+    if ($null -eq $raw) { return $result }
+    foreach ($k in @($raw.Keys)) {
+        $value = [string]$raw[$k]
+        if ([string]::IsNullOrWhiteSpace($value)) { continue }
+        $scoopKey = Resolve-ScoopSetConfigKey -Key ([string]$k)
+        $result[$scoopKey] = $value.Trim()
+    }
+    return $result
+}
+
+function Get-ScoopSetConfigValue {
+    param(
+        $ScoopConfig,
+        [Parameter(Mandatory)][string] $Key,
+        [string] $Default = ''
+    )
+    $cfg = Get-ScoopSetConfigFromSettings -ScoopConfig $ScoopConfig
+    if ($cfg.Contains($Key) -and -not [string]::IsNullOrWhiteSpace([string]$cfg[$Key])) {
+        return [string]$cfg[$Key]
+    }
+    return $Default
+}
+
+function Test-ScoopPathsConfiguredInSettings {
+    param($ScoopConfig)
+
+    $root = Get-ScoopSetConfigValue -ScoopConfig $ScoopConfig -Key 'root_path'
+    $global = Get-ScoopSetConfigValue -ScoopConfig $ScoopConfig -Key 'global_path'
+    return -not [string]::IsNullOrWhiteSpace($root) -and -not [string]::IsNullOrWhiteSpace($global)
+}
+
+function Get-ScoopRuntimeConfigValue {
+    param([Parameter(Mandatory)][string] $Key)
+    if (-not (Test-CommandExists -Name 'scoop')) { return '' }
+    return (& scoop config $Key 2>$null | Out-String).Trim()
+}
+
+function Apply-ScoopSetConfig {
+    param(
+        $ScoopConfig,
+        [switch] $WhatIf
+    )
+
+    if (-not (Test-CommandExists -Name 'scoop') -and -not $WhatIf) {
+        return (New-ScoopStepResult -Status 'skipped' -Detail (msg 'summary.detail.scoop.skip'))
+    }
+
+    $desired = Get-ScoopSetConfigFromSettings -ScoopConfig $ScoopConfig
+    if ($desired.Count -eq 0) {
+        return (New-ScoopStepResult -Status 'skipped' -Detail (msg 'summary.detail.scoop.config.none'))
+    }
+
+    $applied = 0
+    $skipped = 0
+    foreach ($key in @($desired.Keys | Sort-Object)) {
+        $target = [string]$desired[$key]
+        $current = if ($WhatIf) { '' } else { Get-ScoopRuntimeConfigValue -Key $key }
+        if ($current -eq $target) {
+            $skipped++
+            continue
+        }
+        if ($WhatIf) {
+            Write-Plan "[WhatIf] scoop config $key `"$target`""
+            $applied++
+            continue
+        }
+        Write-Info (msg 'scoop.config.setting' $key $target)
+        & scoop config $key $target | Out-Null
+        $applied++
+    }
+
+    if ($applied -gt 0) {
+        $Global:WindotsScoopList = $null
+        $Global:WindotsScoopGlobalList = $null
+    }
+
+    if ($WhatIf) {
+        return (New-ScoopStepResult -Status 'ok' -Detail (msg 'summary.detail.whatif'))
+    }
+    if ($applied -eq 0 -and $skipped -gt 0) {
+        return (New-ScoopStepResult -Status 'skipped' -Detail (msg 'summary.detail.scoop.config.skip'))
+    }
+    return (New-ScoopStepResult -Status 'ok' -Detail (msg 'summary.detail.scoop.config.ok' $applied))
+}
+
+function Write-ScoopSetConfigPlan {
+    param(
+        $ScoopConfig,
+        [bool] $UseMirror = $false
+    )
+
+    $cfg = Get-ScoopSetConfigFromSettings -ScoopConfig $ScoopConfig
+    $root = if ($cfg.Contains('root_path')) { [string]$cfg['root_path'] } else { (msg 'interactive.plan.scoop.path.unset') }
+    $global = if ($cfg.Contains('global_path')) { [string]$cfg['global_path'] } else { (msg 'interactive.plan.scoop.path.unset') }
+    Write-Plan (msg 'interactive.plan.scoop.root' $root)
+    Write-Plan (msg 'interactive.plan.scoop.global_path' $global)
+
+    if ($UseMirror) {
+        $repo = if ($cfg.Contains('SCOOP_REPO')) { [string]$cfg['SCOOP_REPO'] } else { (msg 'interactive.plan.scoop.repo.unset') }
+        Write-Plan (msg 'interactive.plan.scoop.repo' $repo)
+    }
+    else {
+        Write-Plan (msg 'interactive.plan.scoop.repo' (msg 'interactive.plan.scoop.repo.official'))
+    }
+}
+
+function Wait-ScoopSetConfigPaths {
+    param(
+        [Parameter(Mandatory)][pscustomobject] $Ctx,
+        [ref]                                  $Settings
+    )
+
+    $settingsPath = Join-Path $Ctx.Root 'settings.psd1'
+    $wasMissing = -not (Test-ScoopPathsConfiguredInSettings -ScoopConfig $Settings.Value.Scoop)
+
+    if ($wasMissing) {
+        while (-not (Test-ScoopPathsConfiguredInSettings -ScoopConfig $Settings.Value.Scoop)) {
+            Write-Warn (msg 'interactive.scoop.paths.missing' $settingsPath)
+            Write-Info  (msg 'interactive.scoop.paths.hint')
+            $ready = Read-YesNo -Prompt (msg 'interactive.scoop.paths.ready.prompt') -Default $false
+            if (-not $ready) { return $false }
+            $Settings.Value = Import-PowerShellDataFile -Path $settingsPath
+        }
+        return $true
+    }
+
+    $cfg = Get-ScoopSetConfigFromSettings -ScoopConfig $Settings.Value.Scoop
+    Write-Info (msg 'interactive.scoop.paths.review')
+    Write-Info (msg 'interactive.plan.scoop.root' ([string]$cfg['root_path']))
+    Write-Info (msg 'interactive.plan.scoop.global_path' ([string]$cfg['global_path']))
+    $confirmed = Read-YesNo -Prompt (msg 'interactive.scoop.paths.confirm.prompt') -Default $true
+    return [bool]$confirmed
+}
+
 function Install-Scoop {
     param(
         $ScoopConfig,
@@ -82,23 +236,36 @@ function Switch-ScoopMirror {
         [switch] $WhatIf
     )
 
-    $giteeRepo = Get-ScoopConfigValue -ScoopConfig $ScoopConfig -Key 'GiteeRepo' -Default 'https://gitee.com/scoop-installer/scoop'
+    $setConfig = Get-ScoopSetConfigFromSettings -ScoopConfig $ScoopConfig
+    $scoopRepo = if ($setConfig.Contains('SCOOP_REPO')) { [string]$setConfig['SCOOP_REPO'] } else { '' }
+    if ([string]::IsNullOrWhiteSpace($scoopRepo)) {
+        return (New-ScoopStepResult -Status 'skipped' -Detail (msg 'summary.detail.scoop.config.none'))
+    }
 
     if ($WhatIf) {
-        Write-Plan "[WhatIf] scoop config SCOOP_REPO `"$giteeRepo`""
+        if (Test-CommandExists -Name 'scoop') {
+            $currentRepo = Get-ScoopRuntimeConfigValue -Key 'SCOOP_REPO'
+            if ($currentRepo -eq $scoopRepo) {
+                Write-Plan (msg 'scoop.mirror.already')
+                return (New-ScoopStepResult -Status 'skipped' -Detail (msg 'summary.detail.mirror.skip'))
+            }
+        }
         Write-Plan '[WhatIf] scoop update'
         Write-Plan '[WhatIf] scoop bucket rm main; scoop bucket add main'
         return (New-ScoopStepResult -Status 'ok' -Detail (msg 'summary.detail.whatif'))
     }
 
-    $currentRepo = (& scoop config SCOOP_REPO 2>$null | Out-String).Trim()
-    if ($currentRepo -eq $giteeRepo) {
+    $currentRepo = Get-ScoopRuntimeConfigValue -Key 'SCOOP_REPO'
+    if ($currentRepo -eq $scoopRepo) {
         Write-Success (msg 'scoop.mirror.already')
         return (New-ScoopStepResult -Status 'skipped' -Detail (msg 'summary.detail.mirror.skip'))
     }
 
+    if ($currentRepo -ne $scoopRepo) {
+        Write-Warn (msg 'scoop.mirror.repo.pending')
+    }
+
     Write-Info (msg 'scoop.mirror.switching')
-    & scoop config SCOOP_REPO $giteeRepo
     & scoop update
     & scoop bucket rm main 2>$null
     & scoop bucket add main
