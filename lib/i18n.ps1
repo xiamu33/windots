@@ -72,6 +72,7 @@ function Initialize-I18n {
 
 # 查询消息键并格式化。额外参数以 {0},{1}... 顺序填入
 # 用法：Get-Message 'key'  / Get-Message 'key' $arg1 $arg2
+#       Get-Message 'key' 'fallback' — 键缺失时返回 fallback，否则 fallback 作为 {0}
 function Get-Message {
     [CmdletBinding()]
     param(
@@ -86,6 +87,9 @@ function Get-Message {
         $msg = [string]$Global:WindotsMessagesFallback[$Key]
     }
     else {
+        if ($FmtArgs -and $FmtArgs.Count -gt 0) {
+            return [string]$FmtArgs[0]
+        }
         return $Key
     }
 

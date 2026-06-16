@@ -59,7 +59,13 @@ public static class WindotsConsoleCancel {
 
 function Initialize-WindotsConsoleInput {
     Initialize-WindotsConsoleCancelType
-    [WindotsConsoleCancel]::SetHint('Press Ctrl+C again to exit')
+    $hint = if (Get-Command -Name msg -ErrorAction SilentlyContinue) {
+        [string](msg 'ui.ctrlc.hint' 'Press Ctrl+C again to exit')
+    }
+    else {
+        'Press Ctrl+C again to exit'
+    }
+    [WindotsConsoleCancel]::SetHint($hint)
     if ($script:WindotsConsoleInputInit) { return }
     $script:WindotsConsoleInputInit = $true
     try { [Console]::TreatControlCAsInput = $true } catch { }
