@@ -264,6 +264,8 @@ function Select-Items {
     $initialSelected = New-Object 'bool[]' $Items.Count
     for ($i = 0; $i -lt $Items.Count; $i++) { $initialSelected[$i] = $selected[$i] }
     $collapsedGroups = @{}
+    $hideLocked = $false
+    $hasLockedPackages = @($Locked | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }).Count -gt 0
 
     $globalTagEnabled = $GlobalToggle -or $GlobalReadOnly
     $globalFlags = New-Object 'bool[]' $Items.Count
@@ -296,8 +298,16 @@ function Select-Items {
     $cursorColor = $script:WindotsMenuCursorColor
     $headerLines = if ($Grouped) { 4 } else { 3 }
 
+    $isRowLockedPkg = {
+        param([int] $Idx)
+        if (-not (& $isPkgRow $Items[$Idx])) { return $false }
+        $lbl = & $Labeler $Items[$Idx]
+        return $Locked -contains $lbl
+    }
+
     $isRowVisible = {
         param([int] $Idx)
+        if ($hideLocked -and $hasLockedPackages -and (& $isRowLockedPkg $Idx)) { return $false }
         if (-not $Grouped) { return $true }
         $anc = $Items[$Idx].AncestorGroupRowIndices
         if ($null -eq $anc -or @($anc).Count -eq 0) { return $true }
@@ -373,6 +383,16 @@ function Select-Items {
         if (-not (& $rowNavigable $Idx)) { return $false }
         $lbl = & $Labeler $Items[$Idx]
         return $Locked -notcontains $lbl
+    }
+
+    $rowGroupGlobalToggleable = {
+        param([int] $Idx)
+        if (-not $GlobalToggle) { return $false }
+        if (-not (& $isGroupRow $Items[$Idx])) { return $false }
+        foreach ($pi in @($Items[$Idx].PackageIndices)) {
+            if (& $rowGlobalToggleable $pi) { return $true }
+        }
+        return $false
     }
 
     $rowSelectable = {
@@ -496,6 +516,37 @@ function Select-Items {
             elseif ($Locked -notcontains $lbl) {
                 $selected[$pi] = $false
             }
+        }
+    }
+
+    $toggleGroupSubtreeGlobal = {
+        param([int] $GroupRowIdx)
+        $allGlobal = $true
+        $anyToggleable = $false
+        foreach ($pi in @($Items[$GroupRowIdx].PackageIndices)) {
+            if (-not (& $rowGlobalToggleable $pi)) { continue }
+            $anyToggleable = $true
+            if (-not $globalFlags[$pi]) { $allGlobal = $false; break }
+        }
+        if (-not $anyToggleable) { return }
+        $newVal = -not $allGlobal
+        foreach ($pi in @($Items[$GroupRowIdx].PackageIndices)) {
+            if (& $rowGlobalToggleable $pi) { $globalFlags[$pi] = $newVal }
+        }
+    }
+
+    $toggleAllPackagesGlobal = {
+        $allGlobal = $true
+        $anyToggleable = $false
+        for ($i = 0; $i -lt $Items.Count; $i++) {
+            if (-not (& $rowGlobalToggleable $i)) { continue }
+            $anyToggleable = $true
+            if (-not $globalFlags[$i]) { $allGlobal = $false; break }
+        }
+        if (-not $anyToggleable) { return }
+        $newVal = -not $allGlobal
+        for ($i = 0; $i -lt $Items.Count; $i++) {
+            if (& $rowGlobalToggleable $i) { $globalFlags[$i] = $newVal }
         }
     }
 
@@ -667,11 +718,16 @@ function Select-Items {
         }
         $selectedCount = & $getSelectedCount
         if ($selectedCount -gt 0) {
-            Write-Host (msg 'ui.select.selected.count' $selectedCount) -ForegroundColor $cursorColor
+            Write-Host -NoNewline (msg 'ui.select.selected.count' $selectedCount) -ForegroundColor $cursorColor
         }
-        else {
-            Write-Host ''
+        if ($hideLocked -and $hasLockedPackages) {
+            $hiddenLockedCount = 0
+            for ($hi = 0; $hi -lt $Items.Count; $hi++) {
+                if (& $isRowLockedPkg $hi) { $hiddenLockedCount++ }
+            }
+            Write-Host -NoNewline (msg 'ui.select.locked.hidden' $hiddenLockedCount) -ForegroundColor DarkGray
         }
+        Write-Host ''
 
         if ($needScroll -and $scrollTopVis -gt 0) {
             Write-Host (msg 'ui.select.scroll.up' $scrollTopVis) -ForegroundColor DarkGray
@@ -798,9 +854,16 @@ function Select-Items {
                 }
             }
             'G' {
-                if (& $rowGlobalToggleable $cursor) {
+                if ($shift) { & $toggleAllPackagesGlobal }
+                elseif (& $isGroupRow $Items[$cursor]) {
+                    if (& $rowGroupGlobalToggleable $cursor) { & $toggleGroupSubtreeGlobal $cursor }
+                }
+                elseif (& $rowGlobalToggleable $cursor) {
                     $globalFlags[$cursor] = -not $globalFlags[$cursor]
                 }
+            }
+            'H' {
+                if ($hasLockedPackages) { $hideLocked = -not $hideLocked }
             }
             'Enter' {
                 if ($GlobalToggle -and $PSBoundParameters.ContainsKey('GlobalMapOut') -and $null -ne $GlobalMapOut) {
