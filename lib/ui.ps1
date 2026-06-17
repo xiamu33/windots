@@ -243,7 +243,8 @@ function Select-Items {
         [scriptblock] $GlobalSet = $null,
         [ref]         $GlobalMapOut,
         [scriptblock] $InstalledChecker = $null,
-        [scriptblock] $InstalledAnyChecker = $null
+        [scriptblock] $InstalledAnyChecker = $null,
+        [switch]      $DefaultHideLocked
     )
     $Items = @($Items | Where-Object { $null -ne $_ })
     if ($Items.Count -eq 0) { Write-Warn (msg 'ui.empty' $Title); return @() }
@@ -261,10 +262,8 @@ function Select-Items {
         elseif ($Disabled -contains $lbl -or $NotInstalled -contains $lbl) { $false }
         else { [bool](& $DefaultSet $Items[$i]) }
     }
-    $initialSelected = New-Object 'bool[]' $Items.Count
-    for ($i = 0; $i -lt $Items.Count; $i++) { $initialSelected[$i] = $selected[$i] }
     $collapsedGroups = @{}
-    $hideLocked = $false
+    $hideLocked = [bool]$DefaultHideLocked
     $hasHideableRows = @($Locked + $NotInstalled | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique).Count -gt 0
 
     $globalTagEnabled = $GlobalToggle -or $GlobalReadOnly
@@ -491,7 +490,6 @@ function Select-Items {
             if (-not $selected[$i]) { continue }
             if (-not (& $rowSelectable $i)) { continue }
             if ($Grouped -and -not (& $isPkgRow $Items[$i])) { continue }
-            if ($initialSelected[$i]) { continue }
             $count++
         }
         return $count

@@ -111,6 +111,46 @@ function Test-PackageItemScoopInstalledAnyScope {
     return $false
 }
 
+function Find-PackageItemByName {
+    param(
+        [Parameter(Mandatory)][hashtable] $PackagesDef,
+        [Parameter(Mandatory)][string]    $PackageName
+    )
+
+    $match = @{ Item = $null }
+    Invoke-PackageTreeWalk -Nodes @($PackagesDef.Packages) -Visitor {
+        param($Kind, $Node, $GroupDefaults)
+        if ($Kind -eq 'package' -and [string]$Node.Name -eq $PackageName) {
+            $match.Item = $Node
+        }
+    }
+    return $match.Item
+}
+
+function Test-PackageItemScopeMismatch {
+    param(
+        [Parameter(Mandatory)]       $PackageItem,
+        [Parameter(Mandatory)][bool] $ExpectedGlobal
+    )
+
+    foreach ($app in (Get-PackageItemScoopApps -PackageItem $PackageItem)) {
+        $scope = Get-ScoopAppInstalledScope -Name $app
+        if ($null -eq $scope) { continue }
+        $isGlobal = ($scope -eq 'global')
+        if ($isGlobal -ne $ExpectedGlobal) { return $true }
+    }
+    return $false
+}
+
+function Test-PackageItemNeedsScopeMigration {
+    param(
+        [Parameter(Mandatory)]       $PackageItem,
+        [Parameter(Mandatory)][bool] $TargetGlobal
+    )
+
+    return (Test-PackageItemScopeMismatch -PackageItem $PackageItem -ExpectedGlobal $TargetGlobal)
+}
+
 function Test-PackageItemScoopInstalled {
     param(
         [Parameter(Mandatory)]            $PackageItem,

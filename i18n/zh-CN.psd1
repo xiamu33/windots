@@ -161,7 +161,7 @@
     'summary.done'                         = '完成: {0} 成功  {1} 跳过  {2} 失败'
     'summary.done.uninstall'               = '完成: {0} 卸载  {1} 跳过  {2} 失败'
     'summary.log'                          = '详细日志：{0}'
-    'summary.hint'                         = '后续请在新终端使用 windots 命令管理环境（init / install / uninstall / update / clean / link / doctor / cd）'
+    'summary.hint'                         = '后续请在新终端使用 windots 命令管理环境（init / install / uninstall / update / migrate / clean / link / doctor / cd）'
 
     # --- 交互配置 ---
     'interactive.title'                    = '=== Windots 交互配置 ==='
@@ -266,6 +266,19 @@
     'uninstall.nothing.todo'               = '未选择移除任何包，跳过卸载'
     'uninstall.state.missing.err'          = '未找到 state 文件，请先运行 windots init 完成初始化'
 
+    # --- 包 scope 迁移 ---
+    'migrate.interactive.title'            = '=== Windots 包安装位置迁移 ==='
+    'migrate.interactive.step.packages'    = '--- 选择待迁移包（G 切换目标 scope）---'
+    'migrate.packages.title'               = '选择迁移包：'
+    'migrate.plan.title'                   = '=== 迁移计划摘要 ==='
+    'migrate.plan.item'                    = '  {0} : {1} → {2}'
+    'migrate.plan.confirm.prompt'          = '确认执行以上迁移？'
+    'migrate.step.packages'                = '--- 迁移 scoop 包 ---'
+    'migrate.none.selected'                = 'state 中无已选包，无需迁移'
+    'migrate.nothing.todo'                 = '未选择迁移项或所选包已在目标 scope，跳过'
+    'migrate.scoop.missing'                = 'scoop 未安装，无法迁移'
+    'migrate.state.missing.err'            = '未找到 state 文件，请先运行 windots init 完成初始化'
+
     # --- 清理 ---
     'clean.title'                          = '=== windots clean ==='
     'clean.logs.done'                      = '已清理 logs 目录 ({0} 项)'
@@ -318,7 +331,7 @@
     'setup.state.missing.err'              = '未找到 state 文件，请先运行 windots init 完成初始化'
     'setup.reconfigure.init.hint'          = '-Reconfigure 仅对 init 有效，请使用 windots init -Reconfigure'
     'setup.cmd.unknown'                    = '未知子命令：{0}'
-    'setup.cmd.hint'                       = '可用子命令：init, install (i), uninstall (rm), update (up), clean, link, doctor, cd'
+    'setup.cmd.hint'                       = '可用子命令：init, install (i), uninstall (rm), update (up), migrate, clean, link, doctor, cd'
 
     # --- cd ---
     'cd.done'                              = '已进入 {0}'

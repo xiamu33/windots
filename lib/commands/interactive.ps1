@@ -7,11 +7,12 @@ function Get-InteractivePackageSelection {
         [Parameter(Mandatory)][hashtable] $PackagesDef,
         [string[]]                        $SavedSelected = @(),
         [string[]]                        $SavedPackageGlobal = @(),
-        [ValidateSet('install', 'uninstall')]
+        [ValidateSet('install', 'uninstall', 'migrate')]
         [string]                          $Mode = 'install'
     )
 
     $isInstallMode = $Mode -eq 'install'
+    $isMigrateMode = $Mode -eq 'migrate'
     $allPackages = Get-AllPackageItems -PackagesDef $PackagesDef
 
     $locked = @($allPackages | Where-Object {
@@ -102,6 +103,42 @@ function Get-InteractivePackageSelection {
         $selectParams['Locked'] = $locked
         $selectParams['GlobalToggle'] = $true
         $selectParams['GlobalMapOut'] = $globalMapRef
+        $selectParams['GlobalSet'] = {
+            param($row)
+            $pkgName = [string]$row.Package.Name
+            if ($SavedPackageGlobal -contains $pkgName) { return $true }
+            return [bool]$row.ResolvedGlobal
+        }
+        $selectParams['InstalledChecker'] = {
+            param($row, $isGlobal)
+            Test-PackageItemScoopInstalledAtScope -PackageItem $row.Package -InstallGlobal $isGlobal
+        }
+        $selectParams['InstalledAnyChecker'] = {
+            param($row)
+            Test-PackageItemScoopInstalledAnyScope -PackageItem $row.Package
+        }
+    }
+    elseif ($isMigrateMode) {
+        $migrateEligible = @($allPackages | Where-Object {
+                ($SavedSelected -contains [string]$_.Name) -and
+                (Test-PackageItemScoopInstalledAnyScope -PackageItem $_)
+            } | ForEach-Object { [string]$_.Name })
+        $migrateNotEligible = @($allPackages | Where-Object {
+                $migrateEligible -notcontains [string]$_.Name
+            } | ForEach-Object { [string]$_.Name })
+
+        $selectParams['Title'] = (msg 'migrate.packages.title')
+        $selectParams['NotInstalled'] = $migrateNotEligible
+        $selectParams['DefaultHideLocked'] = $true
+        $selectParams['GlobalToggle'] = $true
+        $selectParams['GlobalMapOut'] = $globalMapRef
+        $selectParams['DefaultSet'] = {
+            param($row)
+            $name = [string]$row.Package.Name
+            if ($migrateEligible -notcontains $name) { return $false }
+            $targetGlobal = if ($SavedPackageGlobal -contains $name) { $true } else { [bool]$row.ResolvedGlobal }
+            Test-PackageItemNeedsScopeMigration -PackageItem $row.Package -TargetGlobal $targetGlobal
+        }
         $selectParams['GlobalSet'] = {
             param($row)
             $pkgName = [string]$row.Package.Name

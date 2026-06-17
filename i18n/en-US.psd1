@@ -161,7 +161,7 @@
     'summary.done'                       = 'Done: {0} succeeded  {1} skipped  {2} failed'
     'summary.done.uninstall'             = 'Done: {0} uninstalled  {1} skipped  {2} failed'
     'summary.log'                        = 'Detailed log: {0}'
-    'summary.hint'                       = 'Next: use windots in a new terminal (init, install, uninstall, update, clean, link, doctor, cd)'
+    'summary.hint'                       = 'Next: use windots in a new terminal (init, install, uninstall, update, migrate, clean, link, doctor, cd)'
 
     # --- Interactive ---
     'interactive.title'                  = '=== Windots Interactive Setup ==='
@@ -266,6 +266,19 @@
     'uninstall.nothing.todo'             = 'No packages removed, skipping uninstall'
     'uninstall.state.missing.err'        = 'State file not found. Please run windots init first.'
 
+    # --- Package scope migration ---
+    'migrate.interactive.title'          = '=== Windots package scope migration ==='
+    'migrate.interactive.step.packages'  = '--- Select packages to migrate (G toggles target scope) ---'
+    'migrate.packages.title'             = 'Select packages to migrate:'
+    'migrate.plan.title'                 = '=== Migration plan ==='
+    'migrate.plan.item'                  = '  {0} : {1} -> {2}'
+    'migrate.plan.confirm.prompt'        = 'Proceed with the migration above?'
+    'migrate.step.packages'              = '--- Migrating scoop apps ---'
+    'migrate.none.selected'              = 'No selected packages in state; nothing to migrate'
+    'migrate.nothing.todo'               = 'No packages selected or all already at target scope; skipping'
+    'migrate.scoop.missing'              = 'scoop is not installed; cannot migrate'
+    'migrate.state.missing.err'          = 'State file not found. Please run windots init first.'
+
     # --- Clean ---
     'clean.title'                        = '=== windots clean ==='
     'clean.logs.done'                    = 'Cleaned logs directory ({0} items)'
@@ -318,7 +331,7 @@
     'setup.state.missing.err'            = 'State file not found. Please run windots init first.'
     'setup.reconfigure.init.hint'        = '-Reconfigure only applies to init; use windots init -Reconfigure'
     'setup.cmd.unknown'                  = 'Unknown command: {0}'
-    'setup.cmd.hint'                     = 'Available commands: init, install (i), uninstall (rm), update (up), clean, link, doctor, cd'
+    'setup.cmd.hint'                     = 'Available commands: init, install (i), uninstall (rm), update (up), migrate, clean, link, doctor, cd'
 
     # --- cd ---
     'cd.done'                            = 'Changed directory to {0}'

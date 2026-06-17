@@ -7,8 +7,9 @@
 #   .\setup.ps1              # 智能默认：无 state → init；有 state → install
 #   .\setup.ps1 init         # 全量交互初始化
 #   .\setup.ps1 install      # 增选包并安装（别名 i）
-#   .\setup.ps1 update       # scoop update * + chezmoi（别名 up）
 #   .\setup.ps1 uninstall    # 取消选包并从 scoop 卸载（别名 rm）
+#   .\setup.ps1 update       # scoop update * + chezmoi（别名 up）
+#   .\setup.ps1 migrate      # 单包 user↔global scope 迁移
 #   .\setup.ps1 clean        # 清理 logs；backup 保留最近一份；-All 清除全部 backup 与 state
 #   .\setup.ps1 link         # 重新应用配置文件链接
 #   .\setup.ps1 doctor       # 环境健康检查
@@ -143,6 +144,14 @@ switch ($cmd) {
             exit 1
         }
         Invoke-Uninstall -Ctx $ctx -State $state
+        exit 0
+    }
+    'migrate' {
+        if (-not $state) {
+            Write-Err (msg 'migrate.state.missing.err')
+            exit 1
+        }
+        Invoke-Migrate -Ctx $ctx -State $state
         exit 0
     }
     'clean' {
