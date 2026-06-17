@@ -117,6 +117,34 @@ function Get-CommandOutputLineText {
     return ([string]$Item).Trim()
 }
 
+function Get-ScoopCommandErrorDetail {
+    param(
+        [object[]] $Output,
+        [int]      $ExitCode = 0
+    )
+    if ($null -ne $Output -and @($Output).Count -gt 0) {
+        $lines = @($Output | ForEach-Object {
+                $text = Get-CommandOutputLineText $_
+                if ([string]::IsNullOrWhiteSpace($text)) { return $null }
+                if ($text -match '^\[[\d:]+\]\s*\[(INFO|OK|WARN|ERR|STEP|PLAN)\]\s') { return $null }
+                if ($text -match 'scoop 安装失败|scoop install failed|scoop 卸载失败|scoop uninstall failed') { return $null }
+                $text
+            } | Where-Object { $_ })
+        $errors = @($lines | Where-Object { $_ -match '^ERROR\b' -or $_ -match "^'ERROR'" })
+        if ($errors.Count -gt 0) {
+            return [string]($errors | Select-Object -Last 1)
+        }
+        $fallback = Get-CommandOutputError -Output $Output
+        if (-not [string]::IsNullOrWhiteSpace($fallback)) {
+            return $fallback
+        }
+    }
+    if ($ExitCode -ne 0) {
+        return (msg 'summary.detail.raw.unknown' $ExitCode)
+    }
+    return ''
+}
+
 function Get-CommandOutputError {
     param([object[]] $Output)
     if ($null -eq $Output) { return '' }

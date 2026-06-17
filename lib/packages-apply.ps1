@@ -157,6 +157,19 @@ function Find-PackageItemByName {
     return $match.Item
 }
 
+function Test-ScoopAppNeedsScopeMigration {
+    param(
+        [Parameter(Mandatory)][string] $Name,
+        [Parameter(Mandatory)][bool]   $TargetGlobal
+    )
+    $atUser = Test-ScoopInstalledAtScope -Name $Name -GlobalInstall:$false
+    $atGlobal = Test-ScoopInstalledAtScope -Name $Name -GlobalInstall:$true
+    if ($atUser -and $atGlobal -and -not $TargetGlobal) { return $true }
+    $targetScope = if ($TargetGlobal) { 'global' } else { 'user' }
+    $installedScope = Get-ScoopAppInstalledScope -Name $Name
+    return ($null -ne $installedScope -and $installedScope -ne $targetScope)
+}
+
 function Test-PackageItemScopeMismatch {
     param(
         [Parameter(Mandatory)]       $PackageItem,
@@ -231,9 +244,12 @@ function Set-StatePackageGlobal {
 function Remove-StatePackageGlobalEntries {
     param(
         [Parameter(Mandatory)]            $State,
-        [Parameter(Mandatory)][string[]] $PackageNames
+        [Parameter(Mandatory)]
+        [AllowEmptyCollection()]
+        [string[]]                        $PackageNames
     )
 
+    if (@($PackageNames).Count -eq 0) { return }
     $names = Get-StatePackageGlobalNames -State $State
     if ($names.Count -eq 0) { return }
     $updated = @($names | Where-Object { $PackageNames -notcontains [string]$_ })
@@ -596,6 +612,7 @@ function Install-WindotsScoopApps {
             Get-PackageInstallGlobal -PackagesDef $Ctx.Packages -PackageName ([string]$pkgItem.Name) -State $State
         }
         else { $false }
+        $isMigration = $AllowScopeMigration -and (Test-ScoopAppNeedsScopeMigration -Name $name -TargetGlobal:$global)
         if ($AllowScopeMigration) {
             $appResult = Install-ScoopAppResolved -Name $name -TargetGlobal:$global -WhatIf:$Ctx.WhatIf
         }
@@ -604,7 +621,7 @@ function Install-WindotsScoopApps {
         }
         $desc = if ($pkgItem) { Get-PackageDesc -Package $pkgItem } else { '' }
         $Results.Add([pscustomobject]@{
-                Section = 'packages'
+                Section = if ($isMigration) { 'migrate' } else { 'packages' }
                 Label   = Get-ScoopAppBaseName -Name ([string]$name)
                 Desc    = $desc
                 Status  = [string]$appResult.Status

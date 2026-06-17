@@ -224,7 +224,7 @@ function Migrate-WindotsScoopApps {
         $atGlobal = Test-ScoopInstalledAtScope -Name $appName -GlobalInstall:$true
 
         if ($atUser -and $atGlobal -and -not $targetGlobal) {
-            $appResult = Uninstall-ScoopApp -Name $appName -GlobalInstall -WhatIf:$Ctx.WhatIf
+            $appResult = Uninstall-ScoopApp -Name $appName -GlobalInstall -WhatIf:$Ctx.WhatIf -ForMigration
         }
         else {
             $appResult = Install-ScoopAppResolved -Name $appName -TargetGlobal:$targetGlobal -WhatIf:$Ctx.WhatIf
@@ -232,7 +232,7 @@ function Migrate-WindotsScoopApps {
 
         $desc = if ($pkgItem) { Get-PackageDesc -Package $pkgItem } else { '' }
         $Results.Add([pscustomobject]@{
-                Section = 'packages'
+                Section = 'migrate'
                 Label   = Get-ScoopAppBaseName -Name $appName
                 Desc    = $desc
                 Status  = [string]$appResult.Status
@@ -253,7 +253,7 @@ function Get-MigrateSucceededTargetMap {
 
     $resultByLabel = @{}
     foreach ($r in @($MigrateResults)) {
-        if ([string]$r.Section -ne 'packages') { continue }
+        if ([string]$r.Section -ne 'migrate') { continue }
         $resultByLabel[[string]$r.Label] = [string]$r.Status
     }
 

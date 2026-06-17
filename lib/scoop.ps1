@@ -354,17 +354,21 @@ function Get-ScoopSudoInvokePrefix {
     return "& '$safe' "
 }
 
-function Resolve-ScoopCommandExitCode {
-    param($Result)
-    if ($null -eq $Result) { return 0 }
-    if ($Result -is [int] -or $Result -is [long]) { return [int]$Result }
-    if ($Result -is [System.Array]) {
-        for ($i = $Result.Count - 1; $i -ge 0; $i--) {
-            $item = $Result[$i]
-            if ($item -is [int] -or $item -is [long]) { return [int]$item }
-        }
+function Build-ScoopShellCommandString {
+    param(
+        [Parameter(Mandatory)][string] $Verb,
+        [Parameter(Mandatory)][string] $Name,
+        [switch] $GlobalInstall,
+        [string] $SudoScript = ''
+    )
+    $safeName = $Name.Replace("'", "''")
+    $globalFlag = if ($GlobalInstall) { '-g ' } else { '' }
+    $prefix = if (-not [string]::IsNullOrWhiteSpace($SudoScript)) {
+        $safe = $SudoScript.Replace("'", "''")
+        "& '$safe' "
     }
-    return 0
+    else { '' }
+    return "${prefix}scoop $Verb ${globalFlag}'$safeName'"
 }
 
 function Invoke-ScoopShellCommand {
@@ -372,26 +376,38 @@ function Invoke-ScoopShellCommand {
         [Parameter(Mandatory)][ValidateSet('install', 'uninstall')]
         [string] $Verb,
         [Parameter(Mandatory)][string] $Name,
-        [switch] $GlobalInstall
+        [switch] $GlobalInstall,
+        [switch] $CaptureOutput
     )
     $sudoScript = $null
     if ($GlobalInstall -and -not (Test-IsAdministrator)) {
         $sudoScript = Get-ScoopSudoScriptPath
     }
 
-    # 不可管道到 Out-Host：会破坏 $LASTEXITCODE（变成 Out-Host 的 0）
-    $runner = {
-        param($SudoScript, $Verb, $Name, $Global)
-        if ($SudoScript) {
-            if ($Global) { & $SudoScript scoop $Verb -g $Name }
-            else { & $SudoScript scoop $Verb $Name }
+    $capture = $CaptureOutput -or ($Verb -eq 'uninstall')
+    if ($capture) {
+        # scoop 用 Write-Host 输出 ERROR，进程内 2>&1 捕获不到；子进程重定向可拿到 stdout/stderr
+        $cmd = Build-ScoopShellCommandString -Verb $Verb -Name $Name `
+            -GlobalInstall:$GlobalInstall -SudoScript ([string]$sudoScript)
+        $run = Invoke-CapturedPwshCommand -Command $cmd
+        return @{
+            ExitCode = [int]$run.ExitCode
+            Output   = @($run.Output)
         }
-        elseif ($Global) { & scoop $Verb -g $Name }
-        else { & scoop $Verb $Name }
-        if ($null -ne $LASTEXITCODE) { return [int]$LASTEXITCODE }
-        return 0
     }
-    return (Resolve-ScoopCommandExitCode (& $runner $sudoScript $Verb $Name $GlobalInstall.IsPresent))
+
+    if ($sudoScript) {
+        if ($GlobalInstall) { & $sudoScript scoop $Verb -g $Name }
+        else { & $sudoScript scoop $Verb $Name }
+    }
+    elseif ($GlobalInstall) { & scoop $Verb -g $Name }
+    else { & scoop $Verb $Name }
+
+    $exitCode = if ($null -ne $LASTEXITCODE) { [int]$LASTEXITCODE } else { 0 }
+    return @{
+        ExitCode = $exitCode
+        Output   = @()
+    }
 }
 
 function Install-ScoopApp {
@@ -420,10 +436,10 @@ function Install-ScoopApp {
         return (New-ScoopStepResult -Status 'ok' -Detail (msg 'summary.detail.whatif'))
     }
     Write-Info (msg $(if ($sudoScript) { 'scoop.global.using.sudo' } else { 'scoop.app.installing' }) $displayName)
-    $exitCode = Invoke-ScoopShellCommand -Verb install -Name $Name -GlobalInstall:$GlobalInstall
-    if ($exitCode -ne 0) {
-        $rawErr = (msg 'summary.detail.raw.unknown' $exitCode)
-        Write-Err (msg 'scoop.app.fail' $displayName $exitCode)
+    $run = Invoke-ScoopShellCommand -Verb install -Name $Name -GlobalInstall:$GlobalInstall
+    if ($run.ExitCode -ne 0) {
+        $rawErr = Get-ScoopCommandErrorDetail -Output $run.Output -ExitCode $run.ExitCode
+        Write-Err (msg 'scoop.app.fail' $displayName $run.ExitCode)
         return (New-ScoopStepResult -Status 'failed' -Detail $rawErr)
     }
     $Global:WindotsScoopList = $null
@@ -451,7 +467,7 @@ function Install-ScoopAppResolved {
         $toLabel = if ($targetScope -eq 'global') { (msg 'scoop.scope.global') } else { (msg 'scoop.scope.user') }
         Write-Info (msg 'scoop.scope.migrating' $displayName $fromLabel $toLabel)
         $oldGlobal = ($installedScope -eq 'global')
-        $un = Uninstall-ScoopApp -Name $Name -GlobalInstall:$oldGlobal -WhatIf:$WhatIf
+        $un = Uninstall-ScoopApp -Name $Name -GlobalInstall:$oldGlobal -WhatIf:$WhatIf -ForMigration
         if ($un.Status -eq 'failed') { return $un }
     }
 
@@ -476,7 +492,8 @@ function Uninstall-ScoopApp {
     param(
         [Parameter(Mandatory)][string] $Name,
         [switch] $GlobalInstall,
-        [switch] $WhatIf
+        [switch] $WhatIf,
+        [switch] $ForMigration
     )
     $displayName = Get-ScoopAppBaseName -Name $Name
     if (-not (Test-ScoopInstalled -Name $Name -GlobalInstall:$GlobalInstall)) {
@@ -498,17 +515,24 @@ function Uninstall-ScoopApp {
         return (New-ScoopStepResult -Status 'ok' -Detail (msg 'summary.detail.whatif'))
     }
     Write-Info (msg $(if ($sudoScript) { 'scoop.global.using.sudo' } else { 'scoop.app.uninstalling' }) $displayName)
-    $exitCode = Invoke-ScoopShellCommand -Verb uninstall -Name $Name -GlobalInstall:$GlobalInstall
+    $run = Invoke-ScoopShellCommand -Verb uninstall -Name $Name -GlobalInstall:$GlobalInstall
     $Global:WindotsScoopList = $null
     $Global:WindotsScoopGlobalList = $null
-    if ($exitCode -ne 0) {
-        $rawErr = (msg 'summary.detail.raw.unknown' $exitCode)
-        Write-Err (msg 'scoop.app.uninstall.fail' $displayName $exitCode)
+    $failKey = if ($ForMigration) { 'scoop.app.migrate.fail' } else { 'scoop.app.uninstall.fail' }
+    $stillKey = if ($ForMigration) { 'scoop.app.migrate.incomplete' } else { 'scoop.app.uninstall.still' }
+    $stillDetailKey = if ($ForMigration) { 'summary.detail.migrate.incomplete' } else { 'summary.detail.app.uninstall.still' }
+    if ($run.ExitCode -ne 0) {
+        $rawErr = Get-ScoopCommandErrorDetail -Output $run.Output -ExitCode $run.ExitCode
+        Write-Err (msg $failKey $displayName $rawErr)
         return (New-ScoopStepResult -Status 'failed' -Detail $rawErr)
     }
     if (Test-ScoopInstalled -Name $Name -GlobalInstall:$GlobalInstall) {
-        Write-Err (msg 'scoop.app.uninstall.still' $displayName)
-        return (New-ScoopStepResult -Status 'failed' -Detail (msg 'summary.detail.app.uninstall.still'))
+        $rawErr = Get-ScoopCommandErrorDetail -Output $run.Output
+        if ([string]::IsNullOrWhiteSpace($rawErr)) {
+            $rawErr = (msg $stillDetailKey)
+        }
+        Write-Err (msg $stillKey $displayName $rawErr)
+        return (New-ScoopStepResult -Status 'failed' -Detail $rawErr)
     }
     Write-Success (msg 'scoop.app.uninstalled' $displayName)
     return (New-ScoopStepResult -Status 'ok' -Detail (msg 'summary.detail.app.uninstalled'))
