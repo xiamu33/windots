@@ -371,6 +371,25 @@ function Build-ScoopShellCommandString {
     return "${prefix}scoop $Verb ${globalFlag}'$safeName'"
 }
 
+function Resolve-ScoopShellResult {
+    param($Result)
+    if ($null -eq $Result) {
+        return @{ ExitCode = 0; Output = @() }
+    }
+    if ($Result -is [hashtable]) {
+        return $Result
+    }
+    $items = @($Result)
+    for ($i = $items.Count - 1; $i -ge 0; $i--) {
+        $item = $items[$i]
+        if ($item -is [hashtable] -and $item.Contains('ExitCode')) {
+            return $item
+        }
+    }
+    $code = if ($null -ne $LASTEXITCODE) { [int]$LASTEXITCODE } else { 0 }
+    return @{ ExitCode = $code; Output = @() }
+}
+
 function Invoke-ScoopShellCommand {
     param(
         [Parameter(Mandatory)][ValidateSet('install', 'uninstall')]
@@ -396,18 +415,19 @@ function Invoke-ScoopShellCommand {
         }
     }
 
-    if ($sudoScript) {
-        if ($GlobalInstall) { & $sudoScript scoop $Verb -g $Name }
-        else { & $sudoScript scoop $Verb $Name }
+    $runner = {
+        param($SudoScript, $Verb, $Name, $Global)
+        if ($SudoScript) {
+            if ($Global) { & $SudoScript scoop $Verb -g $Name }
+            else { & $SudoScript scoop $Verb $Name }
+        }
+        elseif ($Global) { & scoop $Verb -g $Name }
+        else { & scoop $Verb $Name }
+        $code = if ($null -ne $LASTEXITCODE) { [int]$LASTEXITCODE } else { 0 }
+        return @{ ExitCode = $code; Output = @() }
     }
-    elseif ($GlobalInstall) { & scoop $Verb -g $Name }
-    else { & scoop $Verb $Name }
-
-    $exitCode = if ($null -ne $LASTEXITCODE) { [int]$LASTEXITCODE } else { 0 }
-    return @{
-        ExitCode = $exitCode
-        Output   = @()
-    }
+    $raw = & $runner $sudoScript $Verb $Name $GlobalInstall.IsPresent
+    return (Resolve-ScoopShellResult $raw)
 }
 
 function Install-ScoopApp {
