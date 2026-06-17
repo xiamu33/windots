@@ -68,7 +68,7 @@ function Invoke-Init {
     Install-WindotsScoopApps -Ctx $Ctx -State $State -Results $results -AllowScopeMigration
     $candidateNames = [string[]]@($State['Selected_Packages'] | ForEach-Object { [string]$_ })
     Update-WindotsInstallState -State $State -PackagesDef $Ctx.Packages `
-        -BaseSelectedPackages @() `
+        -BaseSelectedPackages $candidateNames `
         -CandidatePackageNames $candidateNames `
         -InstallResults @($results)
     Apply-WindotsDotfiles -Ctx $Ctx -State $State -Results $results

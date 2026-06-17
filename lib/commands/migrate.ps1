@@ -241,13 +241,59 @@ function Migrate-WindotsScoopApps {
     }
 }
 
+function Get-MigrateSucceededTargetMap {
+    param(
+        [Parameter(Mandatory)]
+        [AllowEmptyCollection()]
+        [object[]]                        $ScopePlan,
+        [Parameter(Mandatory)]
+        [AllowEmptyCollection()]
+        [object[]]                        $MigrateResults
+    )
+
+    $resultByLabel = @{}
+    foreach ($r in @($MigrateResults)) {
+        if ([string]$r.Section -ne 'packages') { continue }
+        $resultByLabel[[string]$r.Label] = [string]$r.Status
+    }
+
+    $pkgOk = @{}
+    foreach ($entry in @($ScopePlan)) {
+        $pkg = [string]$entry.PackageName
+        $appName = [string]$entry.AppName
+        $label = Get-ScoopAppBaseName -Name $appName
+        $targetGlobal = [bool]$entry.TargetGlobal
+
+        if (-not $pkgOk.ContainsKey($pkg)) { $pkgOk[$pkg] = $true }
+        $status = if ($resultByLabel.ContainsKey($label)) { $resultByLabel[$label] } else { 'failed' }
+        if ($status -eq 'failed') {
+            $pkgOk[$pkg] = $false
+            continue
+        }
+        if (-not (Test-ScoopInstalledAtScope -Name $appName -GlobalInstall:$targetGlobal)) {
+            $pkgOk[$pkg] = $false
+        }
+    }
+
+    $targetMap = @{}
+    foreach ($entry in @($ScopePlan)) {
+        $pkg = [string]$entry.PackageName
+        if (-not $pkgOk[$pkg]) { continue }
+        $targetMap[$pkg] = [bool]$entry.TargetGlobal
+    }
+    return $targetMap
+}
+
 function Update-WindotsMigrateState {
     param(
         [Parameter(Mandatory)]            $State,
         [Parameter(Mandatory)][hashtable] $PackagesDef,
         [Parameter(Mandatory)]
         [AllowEmptyCollection()]
-        [object[]]                        $ScopePlan
+        [object[]]                        $ScopePlan,
+        [Parameter(Mandatory)]
+        [AllowEmptyCollection()]
+        [object[]]                        $MigrateResults
     )
 
     $allSelected = @()
@@ -255,14 +301,11 @@ function Update-WindotsMigrateState {
         $allSelected = @($State['Selected_Packages'] | ForEach-Object { [string]$_ })
     }
 
-    $targetMap = @{}
-    foreach ($entry in @($ScopePlan)) {
-        $targetMap[[string]$entry.PackageName] = [bool]$entry.TargetGlobal
+    $targetMap = Get-MigrateSucceededTargetMap -ScopePlan $ScopePlan -MigrateResults $MigrateResults
+    if ($targetMap.Count -gt 0) {
+        Set-StatePackageGlobal -State $State -SelectedNames $allSelected `
+            -PackageGlobalMap $targetMap -PackagesDef $PackagesDef
     }
-
-    Set-StatePackageGlobal -State $State -SelectedNames $allSelected `
-        -PackageGlobalMap $(if ($targetMap.Count -gt 0) { $targetMap } else { $null }) `
-        -PackagesDef $PackagesDef
     $State['Timestamp'] = (Get-Date).ToString('s')
 }
 
@@ -285,7 +328,8 @@ function Invoke-Migrate {
     Migrate-WindotsScoopApps -Ctx $Ctx -ScopePlan $plan.ScopePlan -Results $results
 
     if (-not $Ctx.WhatIf) {
-        Update-WindotsMigrateState -State $plan.State -PackagesDef $Ctx.Packages -ScopePlan $plan.ScopePlan
+        Update-WindotsMigrateState -State $plan.State -PackagesDef $Ctx.Packages `
+            -ScopePlan $plan.ScopePlan -MigrateResults @($results)
         Save-WindotsState -Path $Ctx.StatePath -State $plan.State
         Write-Success (msg 'interactive.state.saved' $Ctx.StatePath)
     }
