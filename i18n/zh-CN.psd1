@@ -273,6 +273,8 @@
     'migrate.plan.title'                   = '=== 迁移计划摘要 ==='
     'migrate.plan.item'                    = '  {0} : {1} → {2}'
     'migrate.plan.confirm.prompt'          = '确认执行以上迁移？'
+    'migrate.prompt.forgot_g.hint'           = '以下包可能未切换 G 目标 scope，建议迁移：'
+    'migrate.prompt.forgot_g.prompt'         = '是否将以上包迁移至另一 scope？'
     'migrate.step.packages'                = '--- 迁移 scoop 包 ---'
     'migrate.none.selected'                = 'state 中无已选包，无需迁移'
     'migrate.nothing.todo'                 = '未选择迁移项或所选包已在目标 scope，跳过'

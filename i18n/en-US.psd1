@@ -273,6 +273,8 @@
     'migrate.plan.title'                 = '=== Migration plan ==='
     'migrate.plan.item'                  = '  {0} : {1} -> {2}'
     'migrate.plan.confirm.prompt'        = 'Proceed with the migration above?'
+    'migrate.prompt.forgot_g.hint'       = 'These packages may not have toggled G; suggested migration:'
+    'migrate.prompt.forgot_g.prompt'     = 'Migrate the packages above to the other scope?'
     'migrate.step.packages'              = '--- Migrating scoop apps ---'
     'migrate.none.selected'              = 'No selected packages in state; nothing to migrate'
     'migrate.nothing.todo'               = 'No packages selected or all already at target scope; skipping'

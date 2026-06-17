@@ -3,39 +3,127 @@
 # user ↔ global 单包安装位置迁移
 # =====================================================================
 
-function Get-MigrateScopePlan {
+function Get-MigrateSpecifiedGlobal {
+    param(
+        [Parameter(Mandatory)][hashtable] $PackagesDef,
+        [Parameter(Mandatory)][string]    $PackageName,
+        [Parameter(Mandatory)]            $PackageGlobalMap
+    )
+
+    if ($PackageGlobalMap.Contains($PackageName)) {
+        return [bool]$PackageGlobalMap[$PackageName]
+    }
+    $fakeGlobalNames = @($PackageGlobalMap.Keys | Where-Object { [bool]$PackageGlobalMap[$_] })
+    return Get-PackageInstallGlobal -PackagesDef $PackagesDef -PackageName $PackageName -State @{
+        Package_Global = @($fakeGlobalNames)
+    }
+}
+
+function Resolve-MigrateScopePlan {
     param(
         [Parameter(Mandatory)][hashtable] $PackagesDef,
         [Parameter(Mandatory)][string[]]  $PackageNames,
         [Parameter(Mandatory)]            $PackageGlobalMap
     )
 
-    $apps = [System.Collections.Generic.List[object]]::new()
+    $direct = [System.Collections.Generic.List[object]]::new()
+    $prompt = [System.Collections.Generic.List[object]]::new()
+
     foreach ($pkgName in @($PackageNames | ForEach-Object { [string]$_ })) {
         $item = Find-PackageItemByName -PackagesDef $PackagesDef -PackageName $pkgName
         if ($null -eq $item) { continue }
-        $targetGlobal = if ($PackageGlobalMap.Contains($pkgName)) {
-            [bool]$PackageGlobalMap[$pkgName]
-        }
-        else {
-            $fakeGlobalNames = @($PackageGlobalMap.Keys | Where-Object { [bool]$PackageGlobalMap[$_] })
-            Get-PackageInstallGlobal -PackagesDef $PackagesDef -PackageName $pkgName -State @{
-                Package_Global = @($fakeGlobalNames)
+        $specifiedGlobal = Get-MigrateSpecifiedGlobal -PackagesDef $PackagesDef `
+            -PackageName $pkgName -PackageGlobalMap $PackageGlobalMap
+        $otherGlobal = -not $specifiedGlobal
+
+        foreach ($app in (Get-PackageItemScoopApps -PackageItem $item)) {
+            $appName = [string]$app
+            $atSpec = Test-ScoopInstalledAtScope -Name $appName -GlobalInstall:$specifiedGlobal
+            $atOther = Test-ScoopInstalledAtScope -Name $appName -GlobalInstall:$otherGlobal
+            if (-not $atSpec -and -not $atOther) { continue }
+
+            if ($atOther) {
+                [void]$direct.Add([pscustomobject]@{
+                        PackageName  = $pkgName
+                        AppName      = $appName
+                        TargetGlobal = $specifiedGlobal
+                    })
+            }
+            elseif ($atSpec) {
+                [void]$prompt.Add([pscustomobject]@{
+                        PackageName           = $pkgName
+                        AppName               = $appName
+                        SpecifiedGlobal       = $specifiedGlobal
+                        SuggestedTargetGlobal = $otherGlobal
+                    })
             }
         }
-        foreach ($app in (Get-PackageItemScoopApps -PackageItem $item)) {
-            $scope = Get-ScoopAppInstalledScope -Name $app
-            if ($null -eq $scope) { continue }
-            $currentGlobal = ($scope -eq 'global')
-            if ($currentGlobal -eq $targetGlobal) { continue }
-            [void]$apps.Add([pscustomobject]@{
-                    PackageName  = $pkgName
-                    AppName      = [string]$app
-                    TargetGlobal = $targetGlobal
-                })
-        }
     }
-    return @($apps)
+
+    return @{
+        DirectEntries = @($direct)
+        PromptEntries = @($prompt)
+    }
+}
+
+function Get-MigrateAppFromScopeLabel {
+    param(
+        [Parameter(Mandatory)][string] $AppName,
+        [Parameter(Mandatory)][bool]   $TargetGlobal
+    )
+
+    $atUser = Test-ScoopInstalledAtScope -Name $AppName -GlobalInstall:$false
+    $atGlobal = Test-ScoopInstalledAtScope -Name $AppName -GlobalInstall:$true
+    if ($atUser -and $atGlobal) {
+        if ($TargetGlobal) { return (msg 'scoop.scope.user') }
+        return (msg 'scoop.scope.global')
+    }
+    if ($atGlobal) { return (msg 'scoop.scope.global') }
+    return (msg 'scoop.scope.user')
+}
+
+function Write-MigrateScopePlanSummary {
+    param(
+        [Parameter(Mandatory)] $ScopePlan
+    )
+
+    foreach ($entry in @($ScopePlan)) {
+        Write-MigratePlanItemLine -AppName ([string]$entry.AppName) -TargetGlobal ([bool]$entry.TargetGlobal)
+    }
+}
+
+function Write-MigratePlanItemLine {
+    param(
+        [Parameter(Mandatory)][string] $AppName,
+        [Parameter(Mandatory)][bool]   $TargetGlobal,
+        [bool]                         $FromSpecifiedScope = $false,
+        [bool]                         $SpecifiedGlobal = $false
+    )
+
+    if ($FromSpecifiedScope) {
+        $fromLabel = if ($SpecifiedGlobal) { (msg 'scoop.scope.global') } else { (msg 'scoop.scope.user') }
+    }
+    else {
+        $fromLabel = Get-MigrateAppFromScopeLabel -AppName $AppName -TargetGlobal $TargetGlobal
+    }
+    $toLabel = if ($TargetGlobal) { (msg 'scoop.scope.global') } else { (msg 'scoop.scope.user') }
+    Write-Plan (msg 'migrate.plan.item' (Get-ScoopAppBaseName -Name $AppName) $fromLabel $toLabel)
+}
+
+function Write-MigrateForgotGPrompt {
+    param(
+        [Parameter(Mandatory)] $PromptEntries
+    )
+
+    Write-Info ''
+    Write-Warn (msg 'migrate.prompt.forgot_g.hint')
+    foreach ($entry in @($PromptEntries)) {
+        Write-MigratePlanItemLine -AppName ([string]$entry.AppName) `
+            -TargetGlobal ([bool]$entry.SuggestedTargetGlobal) `
+            -FromSpecifiedScope $true `
+            -SpecifiedGlobal ([bool]$entry.SpecifiedGlobal)
+    }
+    Write-Info ''
 }
 
 function Invoke-InteractiveMigrate {
@@ -75,9 +163,27 @@ function Invoke-InteractiveMigrate {
         return $null
     }
 
-    $scopePlan = Get-MigrateScopePlan -PackagesDef $pkg `
+    $resolved = Resolve-MigrateScopePlan -PackagesDef $pkg `
         -PackageNames $migrateNames -PackageGlobalMap $selection.PackageGlobalMap
-    if (@($scopePlan).Count -eq 0) {
+
+    $scopePlan = [System.Collections.Generic.List[object]]::new()
+    foreach ($entry in @($resolved.DirectEntries)) { [void]$scopePlan.Add($entry) }
+
+    if (@($resolved.PromptEntries).Count -gt 0) {
+        Write-MigrateForgotGPrompt -PromptEntries $resolved.PromptEntries
+        $acceptPrompt = Read-YesNo -Prompt (msg 'migrate.prompt.forgot_g.prompt') -Default $true
+        if ($acceptPrompt) {
+            foreach ($entry in @($resolved.PromptEntries)) {
+                [void]$scopePlan.Add([pscustomobject]@{
+                        PackageName  = [string]$entry.PackageName
+                        AppName      = [string]$entry.AppName
+                        TargetGlobal = [bool]$entry.SuggestedTargetGlobal
+                    })
+            }
+        }
+    }
+
+    if ($scopePlan.Count -eq 0) {
         Write-Info (msg 'migrate.nothing.todo')
         return $null
     }
@@ -86,16 +192,7 @@ function Invoke-InteractiveMigrate {
     Write-Step (msg 'migrate.plan.title')
     $useMirror = if ($State.Contains('Scoop_Mirror')) { [bool]$State['Scoop_Mirror'] } else { [bool]$Ctx.Settings.Scoop.UseMirror }
     Write-ScoopSetConfigPlan -ScoopConfig $Ctx.Settings.Scoop -UseMirror $useMirror
-    foreach ($entry in @($scopePlan)) {
-        $fromLabel = if ((Get-ScoopAppInstalledScope -Name $entry.AppName) -eq 'global') {
-            (msg 'scoop.scope.global')
-        }
-        else {
-            (msg 'scoop.scope.user')
-        }
-        $toLabel = if ($entry.TargetGlobal) { (msg 'scoop.scope.global') } else { (msg 'scoop.scope.user') }
-        Write-Plan (msg 'migrate.plan.item' (Get-ScoopAppBaseName -Name $entry.AppName) $fromLabel $toLabel)
-    }
+    Write-MigrateScopePlanSummary -ScopePlan @($scopePlan)
     Write-Info ''
 
     $confirmed = Read-YesNo -Prompt (msg 'migrate.plan.confirm.prompt') -Default $true
@@ -105,10 +202,9 @@ function Invoke-InteractiveMigrate {
     }
 
     return [pscustomobject]@{
-        State              = $State
+        State               = $State
         MigratePackageNames = $migrateNames
-        ScopePlan          = $scopePlan
-        PackageGlobalMap   = $selection.PackageGlobalMap
+        ScopePlan           = @($scopePlan)
     }
 }
 
@@ -122,8 +218,18 @@ function Migrate-WindotsScoopApps {
     Write-Step (msg 'migrate.step.packages')
     foreach ($entry in @($ScopePlan)) {
         $appName = [string]$entry.AppName
+        $targetGlobal = [bool]$entry.TargetGlobal
         $pkgItem = Find-PackageItemByName -PackagesDef $Ctx.Packages -PackageName ([string]$entry.PackageName)
-        $appResult = Install-ScoopAppResolved -Name $appName -TargetGlobal:([bool]$entry.TargetGlobal) -WhatIf:$Ctx.WhatIf
+        $atUser = Test-ScoopInstalledAtScope -Name $appName -GlobalInstall:$false
+        $atGlobal = Test-ScoopInstalledAtScope -Name $appName -GlobalInstall:$true
+
+        if ($atUser -and $atGlobal -and -not $targetGlobal) {
+            $appResult = Uninstall-ScoopApp -Name $appName -GlobalInstall -WhatIf:$Ctx.WhatIf
+        }
+        else {
+            $appResult = Install-ScoopAppResolved -Name $appName -TargetGlobal:$targetGlobal -WhatIf:$Ctx.WhatIf
+        }
+
         $desc = if ($pkgItem) { Get-PackageDesc -Package $pkgItem } else { '' }
         $Results.Add([pscustomobject]@{
                 Section = 'packages'
@@ -141,8 +247,7 @@ function Update-WindotsMigrateState {
         [Parameter(Mandatory)][hashtable] $PackagesDef,
         [Parameter(Mandatory)]
         [AllowEmptyCollection()]
-        [string[]]                        $MigratePackageNames,
-        [hashtable]                       $PackageGlobalMap = $null
+        [object[]]                        $ScopePlan
     )
 
     $allSelected = @()
@@ -150,15 +255,13 @@ function Update-WindotsMigrateState {
         $allSelected = @($State['Selected_Packages'] | ForEach-Object { [string]$_ })
     }
 
-    $mergedMap = @{}
-    foreach ($name in $allSelected) {
-        if ($null -ne $PackageGlobalMap -and $PackageGlobalMap.Contains($name)) {
-            $mergedMap[$name] = [bool]$PackageGlobalMap[$name]
-        }
+    $targetMap = @{}
+    foreach ($entry in @($ScopePlan)) {
+        $targetMap[[string]$entry.PackageName] = [bool]$entry.TargetGlobal
     }
 
     Set-StatePackageGlobal -State $State -SelectedNames $allSelected `
-        -PackageGlobalMap $(if ($mergedMap.Count -gt 0) { $mergedMap } else { $null }) `
+        -PackageGlobalMap $(if ($targetMap.Count -gt 0) { $targetMap } else { $null }) `
         -PackagesDef $PackagesDef
     $State['Timestamp'] = (Get-Date).ToString('s')
 }
@@ -182,8 +285,7 @@ function Invoke-Migrate {
     Migrate-WindotsScoopApps -Ctx $Ctx -ScopePlan $plan.ScopePlan -Results $results
 
     if (-not $Ctx.WhatIf) {
-        Update-WindotsMigrateState -State $plan.State -PackagesDef $Ctx.Packages `
-            -MigratePackageNames $plan.MigratePackageNames -PackageGlobalMap $plan.PackageGlobalMap
+        Update-WindotsMigrateState -State $plan.State -PackagesDef $Ctx.Packages -ScopePlan $plan.ScopePlan
         Save-WindotsState -Path $Ctx.StatePath -State $plan.State
         Write-Success (msg 'interactive.state.saved' $Ctx.StatePath)
     }
