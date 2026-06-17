@@ -66,6 +66,31 @@ function Get-StatePackageGlobalNames {
     return @($pg | ForEach-Object { [string]$_ } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
 }
 
+function Test-StateHasPackageScopeConfigured {
+    param($State)
+
+    if ($null -eq $State) { return $false }
+    if ($State -is [System.Collections.IDictionary]) {
+        return $State.Contains('Package_Global')
+    }
+    return $null -ne $State.PSObject.Properties['Package_Global']
+}
+
+function Get-StateSelectedPackageNames {
+    param($State)
+
+    if ($null -eq $State) { return @() }
+    $selected = $null
+    if ($State -is [System.Collections.IDictionary] -and $State.Contains('Selected_Packages')) {
+        $selected = $State['Selected_Packages']
+    }
+    elseif ($null -ne $State.PSObject.Properties['Selected_Packages']) {
+        $selected = $State.Selected_Packages
+    }
+    if ($null -eq $selected) { return @() }
+    return @($selected | ForEach-Object { [string]$_ } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+}
+
 function Get-PackageInstallGlobal {
     param(
         [Parameter(Mandatory)][hashtable] $PackagesDef,
@@ -75,6 +100,11 @@ function Get-PackageInstallGlobal {
 
     $globalNames = Get-StatePackageGlobalNames -State $State
     if ($globalNames -contains $PackageName) { return $true }
+
+    if ((Test-StateHasPackageScopeConfigured -State $State) -and
+        (Get-StateSelectedPackageNames -State $State) -contains $PackageName) {
+        return $false
+    }
 
     $match = @{
         Found         = $false
@@ -184,8 +214,12 @@ function Set-StatePackageGlobal {
         }
         if ($isGlobal -and -not $globalNames.Contains($n)) { [void]$globalNames.Add($n) }
     }
+    $explicitScope = ($null -ne $PackageGlobalMap)
     if ($globalNames.Count -eq 0) {
-        if ($State -is [hashtable] -and $State.Contains('Package_Global')) {
+        if ($explicitScope) {
+            $State['Package_Global'] = @()
+        }
+        elseif ($State -is [hashtable] -and $State.Contains('Package_Global')) {
             $State.Remove('Package_Global')
         }
     }
@@ -527,15 +561,10 @@ function Update-WindotsInstallState {
 
     $State['Selected_Packages'] = [string[]]@($finalSelected)
     $State['Scoop_Apps'] = Get-ScoopAppsForPackageNames -PackagesDef $PackagesDef -PackageNames $State['Selected_Packages']
-    $globalNames = Get-StatePackageGlobalNames -State $State
-    if ($globalNames.Count -gt 0) {
+    if ($State.Contains('Package_Global')) {
+        $globalNames = Get-StatePackageGlobalNames -State $State
         $pruned = @($globalNames | Where-Object { $State['Selected_Packages'] -contains [string]$_ })
-        if ($pruned.Count -eq 0) {
-            if ($State.Contains('Package_Global')) { $State.Remove('Package_Global') }
-        }
-        else {
-            $State['Package_Global'] = $pruned
-        }
+        $State['Package_Global'] = [string[]]@($pruned)
     }
     $State['Timestamp'] = (Get-Date).ToString('s')
 }

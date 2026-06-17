@@ -226,6 +226,11 @@ function Invoke-InteractivePackages {
 
     $newNames = [string[]]@($selection.SelectedPkgNames | Where-Object { $savedSelected -notcontains $_ })
 
+    $State['Scoop_Apps'] = @($selection.ScoopApps | ForEach-Object { [string]$_ })
+    $State['Selected_Packages'] = @($selection.SelectedPkgNames | ForEach-Object { [string]$_ })
+    Set-StatePackageGlobal -State $State -SelectedNames $selection.SelectedPkgNames `
+        -PackageGlobalMap $selection.PackageGlobalMap -PackagesDef $pkg
+
     Clear-Host
     Write-Step (msg 'install.plan.title')
     $useMirror = if ($State.Contains('Scoop_Mirror')) { [bool]$State['Scoop_Mirror'] } else { [bool]$Ctx.Settings.Scoop.UseMirror }
@@ -242,11 +247,6 @@ function Invoke-InteractivePackages {
         Write-Plan (msg 'install.plan.added.none')
     }
     Write-Info ''
-
-    $State['Scoop_Apps'] = @($selection.ScoopApps | ForEach-Object { [string]$_ })
-    $State['Selected_Packages'] = @($selection.SelectedPkgNames | ForEach-Object { [string]$_ })
-    Set-StatePackageGlobal -State $State -SelectedNames $selection.SelectedPkgNames `
-        -PackageGlobalMap $selection.PackageGlobalMap -PackagesDef $pkg
 
     return [pscustomobject]@{
         PlannedState    = $State
@@ -429,7 +429,6 @@ function Invoke-Interactive {
     }
     $selectedPkgNames = $selection.SelectedPkgNames
     $scoopApps = $selection.ScoopApps
-    $packageGlobalNames = $selection.Package_Global
 
     # ------------------------------------------------------------------
     # 5. chezmoi
@@ -484,7 +483,10 @@ function Invoke-Interactive {
         -SelectedNames $selectedPkgNames `
         -ScoopApps     $scoopApps `
         -PackagesDef   $pkg `
-        -State         @{ Package_Global = $packageGlobalNames }
+        -State         @{
+            Selected_Packages = @($selectedPkgNames | ForEach-Object { [string]$_ })
+            Package_Global    = @($selection.Package_Global | ForEach-Object { [string]$_ })
+        }
     Write-Plan (msg 'interactive.plan.chezmoi'  $(if ($useChezmoi) { $chezmoiUser } else { msg 'interactive.plan.chezmoi.skip' }))
     Write-Plan (msg 'interactive.plan.conflict' $conflictMode)
     Write-Plan (msg 'interactive.plan.linkmode' $linkMode)
@@ -494,19 +496,20 @@ function Invoke-Interactive {
     # 返回计划（安装成功后再写入 state）
     # ------------------------------------------------------------------
     $state = @{
-        Proxy_Enabled     = [bool]$useProxy
-        Proxy_Url         = [string]$proxyUrl
-        Scoop_Mirror      = [bool]$useScoopMirror
-        Scoop_Apps        = @($scoopApps | ForEach-Object { [string]$_ })
-        Selected_Packages = @($selectedPkgNames | ForEach-Object { [string]$_ })
-        Package_Global    = @($packageGlobalNames)
-        Chezmoi_Use       = [bool]$useChezmoi
-        Chezmoi_User      = [string]$chezmoiUser
-        Chezmoi_Apply     = [bool]$chezmoiApply
-        Conflict_Mode     = [string]$conflictMode
-        Link_Mode         = [string]$linkMode
-        Timestamp         = (Get-Date).ToString('s')
+        Proxy_Enabled       = [bool]$useProxy
+        Proxy_Url           = [string]$proxyUrl
+        Scoop_Mirror        = [bool]$useScoopMirror
+        Scoop_Apps          = @($scoopApps | ForEach-Object { [string]$_ })
+        Selected_Packages   = @($selectedPkgNames | ForEach-Object { [string]$_ })
+        Chezmoi_Use         = [bool]$useChezmoi
+        Chezmoi_User        = [string]$chezmoiUser
+        Chezmoi_Apply       = [bool]$chezmoiApply
+        Conflict_Mode       = [string]$conflictMode
+        Link_Mode           = [string]$linkMode
+        Timestamp           = (Get-Date).ToString('s')
     }
+    Set-StatePackageGlobal -State $state -SelectedNames $selectedPkgNames `
+        -PackageGlobalMap $selection.PackageGlobalMap -PackagesDef $pkg
 
     return $state
 }
