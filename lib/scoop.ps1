@@ -419,6 +419,20 @@ function Install-ScoopAppResolved {
     return (Install-ScoopApp -Name $Name -GlobalInstall:$TargetGlobal -WhatIf:$WhatIf)
 }
 
+function Install-ScoopAppEnsure {
+    param(
+        [Parameter(Mandatory)][string] $Name,
+        [Parameter(Mandatory)][bool]   $TargetGlobal,
+        [switch] $WhatIf
+    )
+    $displayName = Get-ScoopAppBaseName -Name $Name
+    if (Test-ScoopInstalled -Name $Name) {
+        Write-Success (msg 'scoop.app.installed' $displayName)
+        return (New-ScoopStepResult -Status 'skipped' -Detail (msg 'summary.detail.app.skip'))
+    }
+    return (Install-ScoopApp -Name $Name -GlobalInstall:$TargetGlobal -WhatIf:$WhatIf)
+}
+
 function Uninstall-ScoopApp {
     param(
         [Parameter(Mandatory)][string] $Name,

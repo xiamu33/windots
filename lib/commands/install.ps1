@@ -12,7 +12,7 @@ function Invoke-Install {
     $results = [System.Collections.Generic.List[object]]::new()
 
     Set-WindotsSessionProxy -State $state
-    Install-WindotsScoopApps -Ctx $Ctx -State $state -Results $results -StepKey 'install.step.packages'
+    Install-WindotsScoopApps -Ctx $Ctx -State $state -Results $results -StepKey 'install.step.packages' -AllowScopeMigration:$false
     Update-WindotsInstallState -State $state -PackagesDef $Ctx.Packages `
         -BaseSelectedPackages $Plan.SavedSelected `
         -CandidatePackageNames $Plan.NewPackageNames `

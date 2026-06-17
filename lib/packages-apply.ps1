@@ -585,7 +585,8 @@ function Install-WindotsScoopApps {
         [Parameter(Mandatory)][pscustomobject] $Ctx,
         [Parameter(Mandatory)]                 $State,
         [Parameter(Mandatory)]                 $Results,
-        [string]                               $StepKey = 'init.step.packages'
+        [string]                               $StepKey = 'init.step.packages',
+        [switch]                               $AllowScopeMigration
     )
 
     Write-Step (msg $StepKey)
@@ -595,7 +596,12 @@ function Install-WindotsScoopApps {
             Get-PackageInstallGlobal -PackagesDef $Ctx.Packages -PackageName ([string]$pkgItem.Name) -State $State
         }
         else { $false }
-        $appResult = Install-ScoopAppResolved -Name $name -TargetGlobal:$global -WhatIf:$Ctx.WhatIf
+        if ($AllowScopeMigration) {
+            $appResult = Install-ScoopAppResolved -Name $name -TargetGlobal:$global -WhatIf:$Ctx.WhatIf
+        }
+        else {
+            $appResult = Install-ScoopAppEnsure -Name $name -TargetGlobal:$global -WhatIf:$Ctx.WhatIf
+        }
         $desc = if ($pkgItem) { Get-PackageDesc -Package $pkgItem } else { '' }
         $Results.Add([pscustomobject]@{
                 Section = 'packages'
