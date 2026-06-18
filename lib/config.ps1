@@ -24,6 +24,7 @@ function Resolve-DestPath {
 
     if ($Dest -eq 'PROFILE') { return $PROFILE }
     if ($Dest -eq 'PROFILE_CurrentUserAllHosts') { return $PROFILE.CurrentUserAllHosts }
+    if ($Dest.StartsWith('PROFILE_ROOT\')) { return Join-Path $PROFILE.Substring(0, $PROFILE.LastIndexOf('\') + 1) $Dest.Substring('PROFILE_ROOT\'.Length) }
     if ($Dest.StartsWith('HOME\')) { return Join-Path $HOME              $Dest.Substring(5) }
     if ($Dest.StartsWith('APPDATA\')) { return Join-Path $env:APPDATA       $Dest.Substring(8) }
     if ($Dest.StartsWith('LOCAL_APPDATA\')) { return Join-Path $env:LOCALAPPDATA  $Dest.Substring(13) }

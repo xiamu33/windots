@@ -1,24 +1,16 @@
-# PowerShell profile scaffold.
-if (Get-Command starship -ErrorAction SilentlyContinue) {
-  &starship init powershell | Invoke-Expression
-}
-if (Get-Command zoxide -ErrorAction SilentlyContinue) {
-  zoxide init powershell | Out-String | Invoke-Expression
-}
-if (Get-Command atuin -ErrorAction SilentlyContinue) {
-  atuin init powershell | Out-String | Invoke-Expression
-}
-if (Get-Command fnm -ErrorAction SilentlyContinue) {
-  fnm env --use-on-cd --shell powershell | Out-String | Invoke-Expression
-}
-if (Get-Command mise -ErrorAction SilentlyContinue) {
-  (&mise activate pwsh) | Out-String | Invoke-Expression
+# PowerShell profile entry (linked to $PROFILE).
+$ProfileRoot = $PSScriptRoot
+
+function script:Import-ProfileDir {
+  param([string]$RelativePath)
+  $dir = Join-Path $ProfileRoot $RelativePath
+  if (-not (Test-Path $dir)) { return }
+  Get-ChildItem $dir -Filter '*.ps1' -File | Sort-Object Name | ForEach-Object { . $_.FullName }
 }
 
-# Set-Alias -Name g -Value git # 已在psc中设置别名
-function l { lsd -la @args }
-function ll { lsd -l @args }
+Import-ProfileDir 'functions'
+. (Join-Path $ProfileRoot 'init/tools.ps1')
+Import-ProfileDir 'aliases'
+Import-ProfileDir 'abbr'
 
-if (Get-Module -ListAvailable -Name PSCompletions) {
-  Import-Module PSCompletions
-}
+. (Join-Path $ProfileRoot 'init/completions.ps1')

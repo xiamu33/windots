@@ -223,9 +223,9 @@
     )
 
     Extras          = @(
-        @{
-            Src  = 'dotfiles/powershell/Profile.ps1'
-            Dest = 'PROFILE'
-        }
+        @{ Src  = 'dotfiles/powershell/Profile.ps1'; Dest = 'PROFILE' }
+        @{ Src  = 'dotfiles/powershell/init'; Dest = 'PROFILE_ROOT\init' }
+        @{ Src  = 'dotfiles/powershell/functions'; Dest = 'PROFILE_ROOT\functions' }
+        @{ Src  = 'dotfiles/powershell/aliases'; Dest = 'PROFILE_ROOT\aliases' }
     )
 }
