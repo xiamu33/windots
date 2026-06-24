@@ -537,6 +537,22 @@
 .glazewm-workspaces .ws-btn.populated {
   background-color: var(--yasb-surface-alt);
 }
+/* Glaze Tiling Direction */
+.glazewm-tiling-direction {
+  background-color: transparent;
+  padding: 0;
+  margin: 0;
+}
+.glazewm-tiling-direction .btn {
+  font-size: 18px;
+  width: 14px;
+  padding: 0 4px 0 4px;
+  color: #cdd6f4;
+  border: none;
+}
+.glazewm-tiling-direction .btn:hover {
+  background-color: #727272;
+}
 /* CPU */
 .cpu-widget:hover {
   background-color: var(--yasb-white-alpha-08);
