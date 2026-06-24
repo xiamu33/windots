@@ -72,13 +72,13 @@ if (-not $global:AbbrHandlerRegistered) {
       $line = $null
       $cursor = $null
       [Microsoft.PowerShell.PSConsoleReadLine]::GetBufferState([ref]$line, [ref]$cursor)
-      $before = $line.Substring(0, $cursor)
+      $before = $line.Substring(0, $cursor).TrimEnd()
       if ($before -match '(?:^|\s)(\S+)$') {
         $word = $Matches[1]
         if ($global:ProfileAbbr.ContainsKey($word)) {
           $expand = Get-AbbrExpandText $word
-          $start = $cursor - $word.Length
-          [Microsoft.PowerShell.PSConsoleReadLine]::Replace($start, $word.Length, "$expand ")
+          $start = $before.Length - $word.Length
+          [Microsoft.PowerShell.PSConsoleReadLine]::Replace($start, $cursor - $start, "$expand ")
           return
         }
       }
