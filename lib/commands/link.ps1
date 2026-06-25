@@ -43,5 +43,10 @@ function Invoke-Link {
             })
     }
 
+    $glazeBuild = Join-Path $env:USERPROFILE '.glzr\glazewm\build-toggle-win-maximize.ps1'
+    if ((Test-Path $glazeBuild) -and -not $Ctx.WhatIf) {
+        try { & $glazeBuild | Out-Null } catch { Write-Warn $_.Exception.Message }
+    }
+
     Show-Summary -Results $results -LogFile $Ctx.LogFile
 }

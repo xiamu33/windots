@@ -191,7 +191,11 @@
                     Items  = @(
                         @{
                             Name     = 'glazewm'
-                            Dotfiles = @{ Src = 'dotfiles/glazewm/config.yaml'; Dest = 'HOME\.glzr\glazewm\config.yaml' }
+                            Dotfiles = @(
+                                @{ Src = 'dotfiles/glazewm/config.yaml'; Dest = 'HOME\.glzr\glazewm\config.yaml' }
+                                @{ Src = 'dotfiles/glazewm/toggle-win-maximize.cs'; Dest = 'HOME\.glzr\glazewm\toggle-win-maximize.cs' }
+                                @{ Src = 'dotfiles/glazewm/build-toggle-win-maximize.ps1'; Dest = 'HOME\.glzr\glazewm\build-toggle-win-maximize.ps1' }
+                            )
                         }
                         @{
                             Name     = 'komorebi'

@@ -2,8 +2,8 @@ general:
   # Commands to run when the WM has started. This is useful for running a
   # script or launching another application.
   # Example: The below command launches Zebar.
-  startup_commands: ["shell-exec zebar"]
-  # startup_commands: ["shell-exec yasb"]
+  # startup_commands: ["shell-exec zebar"]
+  startup_commands: ["shell-exec yasb"]
 
   # Commands to run just before the WM is shutdown.
   # Example: The below command kills Zebar.
@@ -51,7 +51,7 @@ gaps:
 
   # Gap between windows and the screen edge.
   outer_gap:
-    top: "38px"
+    top: "5px"
     right: "5px"
     bottom: "5px"
     left: "5px"
@@ -138,6 +138,8 @@ window_rules:
     match:
       # Ignores any Zebar windows.
       - window_process: { equals: "zebar" }
+      # Ignores any Yasb windows.
+      - window_process: { equals: "yasb" }
 
       # Ignores picture-in-picture windows for browsers.
       - window_title: { regex: "[Pp]icture.in.[Pp]icture" }
@@ -234,8 +236,9 @@ keybindings:
   - commands: ["toggle-tiling"]
     bindings: ["alt+t"]
 
-  # Change the focused window to be fullscreen.
-  - commands: ["toggle-fullscreen"]
+  # Toggle native maximize (ShowWindow); respects YASB app bar, avoids Win+Up snap.
+  - commands:
+      - "shell-exec --hide-window %USERPROFILE%/.glzr/glazewm/toggle-win-maximize.exe"
     bindings: ["alt+f"]
 
   # Minimize focused window.
