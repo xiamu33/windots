@@ -33,7 +33,7 @@
         UseMirror = $true
         MirrorUrl = 'https://gitee.com/scoop-installer/install/raw/master/install.ps1'
         SetConfig = @{
-            ROOT_PATH   = 'C:\Users\xiamu\scoop'
+            ROOT_PATH   = '~\scoop'
             GLOBAL_PATH = 'C:\ProgramData\scoop'
             SCOOP_REPO  = 'https://gitee.com/scoop-installer/scoop'
         }
