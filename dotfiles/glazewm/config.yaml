@@ -124,14 +124,21 @@ window_behavior:
 
 workspaces:
   - name: "1"
+    bind_to_monitor: 0
   - name: "2"
+    bind_to_monitor: 0
   - name: "3"
+    bind_to_monitor: 1
   - name: "4"
+    bind_to_monitor: 1
   - name: "5"
+    bind_to_monitor: 1
   - name: "6"
+    bind_to_monitor: 1
   - name: "7"
   - name: "8"
   - name: "9"
+    bind_to_monitor: 1
 
 window_rules:
   - commands: ["ignore"]
@@ -160,10 +167,64 @@ window_rules:
         window_class: { not_regex: "OpusApp" }
       - window_process: { equals: "POWERPNT" }
         window_class: { not_regex: "PPTFrameClass" }
+      - window_process: { equals: "mmc" }
+      - window_process: { equals: "vmconnect" }
+
+  - commands: ["set-floating --centered"]
+    match:
+      - window_process: { equals: "Taskmgr" }
+      - window_process: { equals: "perfmon" }
+      - window_process: { equals: "TIM" }
+        window_class: { equals: "TXGuiFoundation" }
+        window_title: { includes: "图片查看" }
+
+  - commands: ["set-floating --centered=false --x-pos=10 --y-pos=550"]
+    match:
+      - window_process: { equals: "chrome" }
+        window_title: { includes: "独立翻译" }
+
+  - commands: ["move --workspace 1"]
+    match:
+      - window_process: { equals: "Cursor" }
+        window_title: { includes: "Cursor Agents" }
+      - window_process: { equals: "chrome" }
+        window_title: { equals: "se" }
+  - commands: ["move --workspace 2"]
+    match:
+      - window_process: { equals: "chrome" }
+        window_title: { equals: "fight" }
+      - window_process: { equals: "TIM" }
+        window_class: { equals: "TXGuiFoundation" }
+  - commands: ["move --workspace 3"]
+    match:
+      - window_process: { equals: "Cursor" }
+        window_title: { includes: "fight-plus" }
+      - window_process: { equals: "navicat" }
+  - commands: ["move --workspace 4"]
+    match:
+      - window_process: { equals: "Cursor" }
+        window_title: { includes: "gmtool" }
+      - window_process: { equals: "Tabby" }
+  - commands: ["move --workspace 5"]
+    match:
+      - window_process: { equals: "Cursor" }
+        window_title: { includes: "battleeditor" }
+      - window_process: { equals: "Unity" }
+      - window_process: { equals: "Unity Hub" }
+  - commands: ["move --workspace 9"]
+    match:
+      - window_process: { equals: "Cursor" }
+        window_title: { regex: ".*windots.*" }
+
+  - commands: ["set-floating --centered"]
+    match:
+      - window_process: { equals: "Cursor" }
+        window_title: { regex: "[^Cursor Agents]" }
 
 binding_modes:
   # When enabled, the focused window can be resized via arrow keys or HJKL.
   - name: "resize"
+    display_name: "Resize"
     keybindings:
       - commands: ["resize --width -2%"]
         bindings: ["h", "left"]
@@ -175,6 +236,21 @@ binding_modes:
         bindings: ["j", "down"]
       # Press enter/escape to return to default keybindings.
       - commands: ["wm-disable-binding-mode --name resize"]
+        bindings: ["escape", "enter"]
+
+  # 先按 alt+shift+m 进入模式，再按 a/f/d/s 移动工作区到相邻显示器（避免与单次组合键冲突）
+  - name: "move-ws"
+    display_name: "Move WS"
+    keybindings:
+      - commands: ["move-workspace --direction left"]
+        bindings: ["a", "h", "left"]
+      - commands: ["move-workspace --direction right"]
+        bindings: ["f", "l", "right"]
+      - commands: ["move-workspace --direction up"]
+        bindings: ["d", "k", "up"]
+      - commands: ["move-workspace --direction down"]
+        bindings: ["s", "j", "down"]
+      - commands: ["wm-disable-binding-mode --name move-ws"]
         bindings: ["escape", "enter"]
 
 keybindings:
@@ -213,6 +289,10 @@ keybindings:
   # the name 'resize'.
   - commands: ["wm-enable-binding-mode --name resize"]
     bindings: ["alt+r"]
+
+  # 可选：leader 后再按 a/f/d/s（与下方 alt+shift+a/f/d/s 二选一或并存）
+  - commands: ["wm-enable-binding-mode --name move-ws"]
+    bindings: ["alt+shift+m"]
 
   # Disables window management and all other keybindings until alt+shift+p
   # is pressed again.
@@ -297,16 +377,16 @@ keybindings:
   - commands: ["focus --workspace 9"]
     bindings: ["alt+9"]
 
-  # Move the focused window's parent workspace to a monitor in a given
-  # direction.
-  - commands: ["move-workspace --direction left"]
-    bindings: ["alt+shift+a+a"]
-  - commands: ["move-workspace --direction right"]
-    bindings: ["alt+shift+f+f"]
-  - commands: ["move-workspace --direction up"]
-    bindings: ["alt+shift+d+d"]
-  - commands: ["move-workspace --direction down"]
-    bindings: ["alt+shift+s+s"]
+  # Move the focused window's parent workspace to a monitor in a given direction.
+  # see binding_modes「move-ws」
+  # - commands: ["move-workspace --direction left"]
+  #   bindings: ["alt+shift+a"]
+  # - commands: ["move-workspace --direction right"]
+  #   bindings: ["alt+shift+f"]
+  # - commands: ["move-workspace --direction up"]
+  #   bindings: ["alt+shift+d"]
+  # - commands: ["move-workspace --direction down"]
+  #   bindings: ["alt+shift+s"]
 
   # Move focused window to a workspace defined in `workspaces` config.
   - commands: ["move --workspace 1", "focus --workspace 1"]

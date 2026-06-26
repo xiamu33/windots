@@ -553,6 +553,33 @@
 .glazewm-tiling-direction .btn:hover {
   background-color: #727272;
 }
+/* Glaze Binding Mode */
+.glazewm-binding-mode {
+  background-color: var(--yasb-white-alpha-08);
+  margin: 0 4px;
+  padding: 0 8px;
+  border-radius: 4px;
+}
+.glazewm-binding-mode .label {
+  color: var(--yasb-accent);
+  font-size: 12px;
+  font-weight: 600;
+}
+.glazewm-binding-mode .label-offline {
+  color: var(--yasb-fg-muted);
+  font-size: 10px;
+}
+.glazewm-binding-mode .icon {
+  font-family: var(--icons-font);
+  font-size: 12px;
+  padding-right: 4px;
+}
+.glazewm-binding-mode .icon.resize {
+  color: #f9e2af;
+}
+.glazewm-binding-mode .icon.move-ws {
+  color: #89b4fa;
+}
 /* CPU */
 .cpu-widget:hover {
   background-color: var(--yasb-white-alpha-08);

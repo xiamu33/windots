@@ -37,6 +37,7 @@ bars:
         # - quick_launch
         - glazewm_workspaces
         - glazewm_tiling_direction
+        - glazewm_binding_mode
         - active_window
       center:
         - clock
@@ -113,6 +114,24 @@ widgets:
     options:
       horizontal_label: "\udb81\udce1"
       vertical_label: "\udb81\udce2"
+  glazewm_binding_mode:
+    type: glazewm.binding_mode.GlazewmBindingModeWidget
+    options:
+      hide_if_no_active: true
+      label: "<span> {icon}</span>{binding_mode}"
+      label_alt: "GlazeWM Mode: {binding_mode}"
+      default_icon: "\uE73E"
+      icons:
+        none: ""
+        resize: "\uE740"
+        move-ws: "\uE8EB"
+      binding_modes_to_cycle_through:
+        - none
+        - resize
+        - move-ws
+      callbacks:
+        on_left: toggle_label
+        on_right: disable_binding_mode
   active_window:
     type: yasb.active_window.ActiveWindowWidget
     options:
