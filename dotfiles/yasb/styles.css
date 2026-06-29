@@ -530,7 +530,12 @@
   font-weight: 600;
   border-radius: 3px;
 }
-.glazewm-workspaces .ws-btn.active_populated {
+.glazewm-workspaces .ws-btn.active_populated,
+.glazewm-workspaces .ws-btn.active_empty {
+  background-color: rgba(76, 194, 255, 0.66);
+}
+.glazewm-workspaces .ws-btn.focused_populated,
+.glazewm-workspaces .ws-btn.focused_empty {
   color: var(--yasb-accent-fg);
   background-color: var(--yasb-accent);
 }
