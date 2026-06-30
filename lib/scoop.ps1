@@ -58,6 +58,14 @@ function Resolve-ScoopSetConfigKey {
 function Resolve-ScoopConfigPathValue {
     param([Parameter(Mandatory)][string] $Value)
     $v = $Value.Trim()
+    if ($v -match '(?i)\$env:') {
+        $v = [regex]::Replace($v, '(?i)\$env:([^\\/]+)', {
+            param($m)
+            $ev = [Environment]::GetEnvironmentVariable($m.Groups[1].Value)
+            if ([string]::IsNullOrEmpty($ev)) { return $m.Value }
+            return $ev
+        })
+    }
     if ($v -match '^~[\\/]') {
         return $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($v)
     }
