@@ -39,6 +39,7 @@
         }
         Buckets   = @(
             'extras',
+            'versions',
             'nerd-fonts',
             @{ Name = 'abyss'; Url = 'https://gitee.com/abgox/abyss' }
         )
