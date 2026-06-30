@@ -55,6 +55,15 @@ function Resolve-ScoopSetConfigKey {
     }
 }
 
+function Resolve-ScoopConfigPathValue {
+    param([Parameter(Mandatory)][string] $Value)
+    $v = $Value.Trim()
+    if ($v -match '^~[\\/]') {
+        return $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($v)
+    }
+    return $v
+}
+
 function Get-ScoopSetConfigFromSettings {
     param($ScoopConfig)
 
@@ -70,6 +79,11 @@ function Get-ScoopSetConfigFromSettings {
         if ([string]::IsNullOrWhiteSpace($value)) { continue }
         $scoopKey = Resolve-ScoopSetConfigKey -Key ([string]$k)
         $result[$scoopKey] = $value.Trim()
+    }
+    foreach ($key in @('root_path', 'global_path', 'cache_path')) {
+        if ($result.Contains($key)) {
+            $result[$key] = Resolve-ScoopConfigPathValue -Value ([string]$result[$key])
+        }
     }
     return $result
 }
