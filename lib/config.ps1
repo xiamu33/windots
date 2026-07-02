@@ -18,13 +18,125 @@ function Resolve-RepoPath {
 }
 
 # packages.psd1 Dotfiles.Dest 占位符展开
-# 支持：HOME\  APPDATA\  LOCAL_APPDATA\  HOMEPATH\  PROFILE  PROFILE_CurrentUserAllHosts
+# 支持：HOME\  APPDATA\  LOCAL_APPDATA\  HOMEPATH\  SCOOP_ROOT\  SCOOP_GLOBAL\
+#       PROFILE  PROFILE_CurrentUserAllHosts  PROFILE_ROOT\
+# Src/Dest glob: * matches one path segment; star count must match in Src and Dest
+function Test-DotfilesGlobPattern {
+    param([Parameter(Mandatory)][string] $Path)
+    return ($Path.IndexOf('*') -ge 0) -or ($Path.IndexOf('?') -ge 0)
+}
+
+function Convert-DotfilesGlobToRegex {
+    param([Parameter(Mandatory)][string] $Glob)
+
+    $sb = [System.Text.StringBuilder]::new()
+    [void]$sb.Append('^')
+    for ($i = 0; $i -lt $Glob.Length; $i++) {
+        $c = $Glob[$i]
+        switch ($c) {
+            '*' { [void]$sb.Append('([^\\/]*)') }
+            '?' { [void]$sb.Append('[^\\/]') }
+            '\' { [void]$sb.Append('\\') }
+            '/' { [void]$sb.Append('[\\/]') }
+            default {
+                [void]$sb.Append([regex]::Escape([string]$c))
+            }
+        }
+    }
+    [void]$sb.Append('$')
+    return $sb.ToString()
+}
+
+function Merge-DotfilesGlobDest {
+    param(
+        [Parameter(Mandatory)][string] $LiteralPrefix,
+        [Parameter(Mandatory)][string] $GlobSuffix,
+        [Parameter(Mandatory)][string[]] $Captures
+    )
+
+    $parts = $GlobSuffix -split '\*', [System.StringSplitOptions]::None
+    $sb = [System.Text.StringBuilder]::new()
+    [void]$sb.Append($LiteralPrefix)
+    for ($i = 0; $i -lt $parts.Length; $i++) {
+        [void]$sb.Append($parts[$i])
+        if ($i -lt $Captures.Length) { [void]$sb.Append($Captures[$i]) }
+    }
+    return $sb.ToString()
+}
+
+function Expand-DotfilesGlobEntry {
+    param(
+        [Parameter(Mandatory)][string] $SrcPattern,
+        [Parameter(Mandatory)][string] $DestPattern,
+        [Parameter(Mandatory)][string] $RepoRoot
+    )
+
+    $results = [System.Collections.Generic.List[object]]::new()
+    $srcNorm = $SrcPattern.Trim().Replace('\', '/')
+
+    if (-not (Test-DotfilesGlobPattern $srcNorm)) {
+        $src = Resolve-RepoPath -RepoRoot $RepoRoot -Value $SrcPattern
+        $dest = Resolve-DestPath -Dest $DestPattern
+        $results.Add([pscustomobject]@{ Src = $src; Dest = $dest })
+        return $results.ToArray()
+    }
+
+    $starIdx = $srcNorm.IndexOf('*')
+    if ($starIdx -lt 0) { $starIdx = $srcNorm.IndexOf('?') }
+    $literalPrefix = $srcNorm.Substring(0, $starIdx)
+    $globSuffix = $srcNorm.Substring($starIdx)
+    $searchRoot = Join-Path $RepoRoot ($literalPrefix.TrimEnd('/') -replace '/', '\')
+
+    $destResolved = Resolve-DestPath -Dest $DestPattern
+    if (-not (Test-DotfilesGlobPattern $destResolved)) {
+        Write-Warn (msg 'links.glob.dest.mismatch' $DestPattern)
+        return @()
+    }
+
+    $destStarIdx = $destResolved.IndexOf('*')
+    if ($destStarIdx -lt 0) { $destStarIdx = $destResolved.IndexOf('?') }
+    $destLiteralPrefix = $destResolved.Substring(0, $destStarIdx)
+    $destGlobSuffix = $destResolved.Substring($destStarIdx)
+
+    $srcStars = ([regex]::Matches($globSuffix, '\*')).Count
+    $destStars = ([regex]::Matches($destGlobSuffix, '\*')).Count
+    if ($srcStars -ne $destStars) {
+        Write-Warn (msg 'links.glob.star.mismatch' $SrcPattern $DestPattern)
+        return @()
+    }
+
+    if (-not (Test-Path -LiteralPath $searchRoot)) { return @() }
+
+    $globRegex = Convert-DotfilesGlobToRegex -Glob ($globSuffix -replace '/', '\')
+    Get-ChildItem -LiteralPath $searchRoot -Recurse -File -ErrorAction SilentlyContinue | ForEach-Object {
+        $rel = $_.FullName.Substring($searchRoot.Length).TrimStart('\')
+        $m = [regex]::Match($rel, $globRegex)
+        if (-not $m.Success) { return }
+
+        $captures = [string[]]@()
+        for ($g = 1; $g -lt $m.Groups.Count; $g++) {
+            $captures += $m.Groups[$g].Value
+        }
+
+        $dest = Merge-DotfilesGlobDest -LiteralPrefix $destLiteralPrefix -GlobSuffix $destGlobSuffix -Captures $captures
+        $results.Add([pscustomobject]@{ Src = $_.FullName; Dest = $dest })
+    }
+
+    return $results.ToArray()
+}
+
 function Resolve-DestPath {
     param([Parameter(Mandatory)][string] $Dest)
 
     if ($Dest -eq 'PROFILE') { return $PROFILE }
     if ($Dest -eq 'PROFILE_CurrentUserAllHosts') { return $PROFILE.CurrentUserAllHosts }
     if ($Dest.StartsWith('PROFILE_ROOT\')) { return Join-Path $PROFILE.Substring(0, $PROFILE.LastIndexOf('\') + 1) $Dest.Substring('PROFILE_ROOT\'.Length) }
+
+    if ($Dest -eq 'SCOOP_ROOT') { return Get-ScoopUserRoot }
+    if ($Dest.StartsWith('SCOOP_ROOT\')) { return Join-Path (Get-ScoopUserRoot) $Dest.Substring('SCOOP_ROOT\'.Length) }
+    if ($Dest -eq 'SCOOP_GLOBAL') { return Get-ScoopGlobalRoot }
+    if ($Dest.StartsWith('SCOOP_GLOBAL\')) { return Join-Path (Get-ScoopGlobalRoot) $Dest.Substring('SCOOP_GLOBAL\'.Length) }
+
     if ($Dest.StartsWith('HOME\')) { return Join-Path $HOME              $Dest.Substring(5) }
     if ($Dest.StartsWith('APPDATA\')) { return Join-Path $env:APPDATA       $Dest.Substring(8) }
     if ($Dest.StartsWith('LOCAL_APPDATA\')) { return Join-Path $env:LOCALAPPDATA  $Dest.Substring(13) }

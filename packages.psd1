@@ -19,10 +19,12 @@
 #   Default  - 可选；覆盖分组 Default
 #   Global   - 可选；为 $true 时 scoop install/uninstall 使用 -g（全局安装）
 #   Packages - 可选；实际 scoop 安装名（字符串或数组）
-#   Dotfiles - 可选；@{ Src='...'; Dest='...' } 或数组
+#   Dotfiles - 可选；@{ Src='...'; Dest='...' } 或数组；Src/Dest 支持 glob（* ?）
 #
 # 重要：
 #   - Dest 路径写成字符串字面量，由脚本在运行时展开
+#   - 占位符：HOME\ APPDATA\ LOCAL_APPDATA\ SCOOP_ROOT\ SCOOP_GLOBAL\ PROFILE ...
+#   - glob 示例：Src='dotfiles/foo/*/bar.json' Dest='SCOOP_ROOT\persist\foo\*\bar.json'
 #   - 此文件只允许字面量，不允许表达式（psd1 格式限制）
 # =====================================================================
 @{
@@ -169,7 +171,14 @@
                         @{ Name = 'altsnap'; Packages = 'extras/altsnap' }
                         @{ Name = 'everything'; Packages = 'extras/everything' }
                         @{ Name = 'everythingtoolbar'; Packages = 'extras/everythingtoolbar' }
-                        @{ Name = 'flow-launcher'; Packages = 'extras/Flow-Launcher' }
+                        @{
+                            Name     = 'flow-launcher'
+                            Packages = 'extras/Flow-Launcher'
+                            Dotfiles = @(
+                                @{ Src = 'dotfiles/flow-launcher/Settings/Settings.json'; Dest = 'SCOOP_ROOT\persist\Flow-Launcher\UserData\Settings\Settings.json' }
+                                @{ Src = 'dotfiles/flow-launcher/Settings/Plugins/*/Settings.json'; Dest = 'SCOOP_ROOT\persist\Flow-Launcher\UserData\Settings\Plugins\*\Settings.json' }
+                            )
+                        }
                         @{ Name = 'InputTip'; Packages = 'abyss/abgox.InputTip-zip' }
                         @{ Name = 'pixpin'; Packages = 'abyss/PixPin.PixPin' }
                         @{ Name = 'powertoys'; Packages = 'extras/powertoys' }
@@ -227,9 +236,9 @@
     )
 
     Extras          = @(
-        @{ Src  = 'dotfiles/powershell/Profile.ps1'; Dest = 'PROFILE' }
-        @{ Src  = 'dotfiles/powershell/init'; Dest = 'PROFILE_ROOT\init' }
-        @{ Src  = 'dotfiles/powershell/functions'; Dest = 'PROFILE_ROOT\functions' }
-        @{ Src  = 'dotfiles/powershell/aliases'; Dest = 'PROFILE_ROOT\aliases' }
+        @{ Src = 'dotfiles/powershell/Profile.ps1'; Dest = 'PROFILE' }
+        @{ Src = 'dotfiles/powershell/init'; Dest = 'PROFILE_ROOT\init' }
+        @{ Src = 'dotfiles/powershell/functions'; Dest = 'PROFILE_ROOT\functions' }
+        @{ Src = 'dotfiles/powershell/aliases'; Dest = 'PROFILE_ROOT\aliases' }
     )
 }

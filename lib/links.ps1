@@ -27,6 +27,36 @@ function Get-LinkDisplayLabel {
     return [IO.Path]::GetFileName($Src)
 }
 
+function Add-PlannedDotfileLinks {
+    param(
+        [Parameter(Mandatory)] $Links,
+        [Parameter(Mandatory)][string] $RepoRoot,
+        [Parameter(Mandatory)] $Dot,
+        [string] $PackageName = ''
+    )
+
+    if ($null -eq $Dot) { return }
+
+    $srcPattern = [string]$Dot.Src
+    $destPattern = [string]$Dot.Dest
+    $expanded = @(Expand-DotfilesGlobEntry -SrcPattern $srcPattern -DestPattern $destPattern -RepoRoot $RepoRoot)
+
+    if ($expanded.Count -eq 0 -and (Test-DotfilesGlobPattern $srcPattern)) {
+        Write-Warn (msg 'links.glob.no.match' $srcPattern)
+        return
+    }
+
+    foreach ($link in $expanded) {
+        $srcRel = [string]$link.Src
+        if ($srcRel.StartsWith($RepoRoot, [StringComparison]::OrdinalIgnoreCase)) {
+            $srcRel = $srcRel.Substring($RepoRoot.Length).TrimStart('\')
+        }
+        $leaf = [IO.Path]::GetFileName([string]$link.Dest)
+        $label = Get-LinkDisplayLabel -Src $srcRel -PackageName $PackageName -DestLeaf $leaf
+        $Links.Add([pscustomobject]@{ Src = [string]$link.Src; Dest = [string]$link.Dest; Label = $label })
+    }
+}
+
 function Get-PlannedLinks {
     param(
         [Parameter(Mandatory)][string] $RepoRoot,
@@ -37,22 +67,13 @@ function Get-PlannedLinks {
 
     foreach ($item in $SelectedItems) {
         if ((-not $item.Contains('Dotfiles')) -or ($null -eq $item.Dotfiles)) { continue }
-        $dotfilesList = @($item.Dotfiles)
-        foreach ($dot in $dotfilesList) {
-            if ($null -eq $dot) { continue }
-            $src = Resolve-RepoPath -RepoRoot $RepoRoot -Value ([string]$dot.Src)
-            $dest = Resolve-DestPath -Dest ([string]$dot.Dest)
-            $leaf = [IO.Path]::GetFileName($dest)
-            $label = Get-LinkDisplayLabel -Src ([string]$dot.Src) -PackageName ([string]$item.Name) -DestLeaf $leaf
-            $links.Add([pscustomobject]@{ Src = $src; Dest = $dest; Label = $label })
+        foreach ($dot in @($item.Dotfiles)) {
+            Add-PlannedDotfileLinks -Links $links -RepoRoot $RepoRoot -Dot $dot -PackageName ([string]$item.Name)
         }
     }
 
     foreach ($extra in $Extras) {
-        $src = Resolve-RepoPath -RepoRoot $RepoRoot -Value ([string]$extra.Src)
-        $dest = Resolve-DestPath -Dest ([string]$extra.Dest)
-        $label = Get-LinkDisplayLabel -Src ([string]$extra.Src)
-        $links.Add([pscustomobject]@{ Src = $src; Dest = $dest; Label = $label })
+        Add-PlannedDotfileLinks -Links $links -RepoRoot $RepoRoot -Dot $extra
     }
 
     return @($links)
