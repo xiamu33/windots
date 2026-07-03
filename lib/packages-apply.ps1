@@ -136,6 +136,58 @@ function Resolve-ScoopPathRoot {
     return Get-ScoopUserRoot
 }
 
+# Persist 漂移检测：给定包名 + State + PackagesDef，返回该包每个 scoop app 的 drift 结果。
+# - DualInstall: app 在 user 与 global 两侧 apps\ 均已安装
+# - PersistDrift: intent 侧 persist 目录为空（或不存在）且另一 scope 侧 persist 含文件
+# intent 侧由 Resolve-ScoopPathRoot 决定（state.Package_Global → state user 默认 → psd1 继承）。
+# 供 doctor（#03 非交互报告）与 Apply-WindotsDotfiles（#04 可选同步）共用。
+function Get-PackagePersistDrift {
+    param(
+        [Parameter(Mandatory)][hashtable] $PackagesDef,
+        [Parameter(Mandatory)][string]    $PackageName,
+        $State = $null
+    )
+
+    $results = [System.Collections.Generic.List[object]]::new()
+    $item = Find-PackageItemByName -PackagesDef $PackagesDef -PackageName $PackageName
+    if ($null -eq $item) { return @($results) }
+
+    $intentGlobal = Get-PackageInstallGlobal -PackagesDef $PackagesDef -PackageName $PackageName -State $State
+    $intentRoot   = Resolve-ScoopPathRoot   -PackagesDef $PackagesDef -PackageName $PackageName -State $State
+    $otherRoot    = if ($intentGlobal) { Get-ScoopUserRoot } else { Get-ScoopGlobalRoot }
+
+    foreach ($app in (Get-PackageItemScoopApps -PackageItem $item)) {
+        $base = Get-ScoopAppBaseName -Name $app
+        $userInstalled   = Test-ScoopInstalledAtScope -Name $app -GlobalInstall:$false
+        $globalInstalled = Test-ScoopInstalledAtScope -Name $app -GlobalInstall:$true
+
+        $intentPersist = Join-Path $intentRoot "persist\$base"
+        $otherPersist  = Join-Path $otherRoot  "persist\$base"
+
+        $intentEmpty = $true
+        if (Test-Path -LiteralPath $intentPersist) {
+            $intentFiles = @(Get-ChildItem -LiteralPath $intentPersist -Recurse -File -ErrorAction SilentlyContinue)
+            $intentEmpty = $intentFiles.Count -eq 0
+        }
+        $otherHasFiles = $false
+        if (Test-Path -LiteralPath $otherPersist) {
+            $otherFiles = @(Get-ChildItem -LiteralPath $otherPersist -Recurse -File -ErrorAction SilentlyContinue)
+            $otherHasFiles = $otherFiles.Count -gt 0
+        }
+
+        $results.Add([pscustomobject]@{
+            App           = $base
+            DualInstall   = ($userInstalled -and $globalInstalled)
+            PersistDrift  = ($intentEmpty -and $otherHasFiles)
+            IntentRoot    = $intentRoot
+            OtherRoot     = $otherRoot
+            IntentPersist = $intentPersist
+            OtherPersist  = $otherPersist
+        })
+    }
+    return @($results)
+}
+
 function Test-PackageItemScoopInstalledAtScope {
     param(
         [Parameter(Mandatory)]            $PackageItem,

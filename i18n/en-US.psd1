@@ -114,6 +114,10 @@
     'doctor.windots.missing'             = 'not registered, run windots init to register'
     'doctor.state.name'                  = 'state file'
     'doctor.state.missing'               = 'not found, will be created on first run'
+    'doctor.persist.dual.name'           = 'Persist dual install'
+    'doctor.persist.dual.detail'         = '{0} installed in both user and global: {1} | {2}'
+    'doctor.persist.empty.name'          = 'Persist drift'
+    'doctor.persist.empty.detail'        = '{0} intent-side persist empty, other side has data: {1} <- {2}; sync on link or run windots migrate'
 
     # --- Summary ---
     'summary.title'                      = '=== Run Summary ==='

@@ -3,7 +3,11 @@
 # =====================================================================
 
 function Invoke-Doctor {
-    param([Parameter(Mandatory)][string] $RepoRoot)
+    param(
+        [Parameter(Mandatory)][string] $RepoRoot,
+        $State = $null,
+        $PackagesDef = $null
+    )
 
     Write-Step (msg 'doctor.title')
     $checks = [System.Collections.Generic.List[object]]::new()
@@ -53,6 +57,45 @@ function Invoke-Doctor {
             Status = if ($stateOk) { 'OK' } else { 'INFO' }
             Detail = if ($stateOk) { $statePath } else { msg 'doctor.state.missing' }
         })
+
+    # --- Persist 漂移检查（需要 state + packages；仅对选中且 Dotfiles 含 SCOOP_PATH 的包） ---
+    $doctorState = $State
+    if ($null -eq $doctorState -and $stateOk) {
+        try { $doctorState = Import-PowerShellDataFile -Path $statePath } catch { $doctorState = $null }
+    }
+    $doctorPkg = $PackagesDef
+    if ($null -eq $doctorPkg) {
+        try { $doctorPkg = Import-PowerShellDataFile -Path (Join-Path $RepoRoot 'packages.psd1') } catch { $doctorPkg = $null }
+    }
+    if ($null -ne $doctorState -and $null -ne $doctorPkg) {
+        $userRoot = Get-ScoopUserRoot
+        $globalRoot = Get-ScoopGlobalRoot
+        foreach ($item in (Get-SelectedPackageItems -State $doctorState -PackagesDef $doctorPkg)) {
+            if (-not $item.Contains('Dotfiles') -or $null -eq $item.Dotfiles) { continue }
+            $hasScoopPath = $false
+            foreach ($dot in @($item.Dotfiles)) {
+                if ([string]$dot.Dest -like 'SCOOP_PATH*') { $hasScoopPath = $true; break }
+            }
+            if (-not $hasScoopPath) { continue }
+
+            foreach ($d in (Get-PackagePersistDrift -PackagesDef $doctorPkg -PackageName ([string]$item.Name) -State $doctorState)) {
+                if ($d.DualInstall) {
+                    $checks.Add([pscustomobject]@{
+                            Item   = msg 'doctor.persist.dual.name'
+                            Status = 'WARN'
+                            Detail = (msg 'doctor.persist.dual.detail' $d.App (Join-Path $userRoot "apps\$($d.App)") (Join-Path $globalRoot "apps\$($d.App)"))
+                        })
+                }
+                if ($d.PersistDrift) {
+                    $checks.Add([pscustomobject]@{
+                            Item   = msg 'doctor.persist.empty.name'
+                            Status = 'WARN'
+                            Detail = (msg 'doctor.persist.empty.detail' $d.App $d.IntentPersist $d.OtherPersist)
+                        })
+                }
+            }
+        }
+    }
 
     Write-Host ''
     foreach ($c in $checks) {

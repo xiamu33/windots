@@ -114,6 +114,10 @@
     'doctor.windots.missing'               = '未注册，运行 windots init 重新注册'
     'doctor.state.name'                    = 'state 文件'
     'doctor.state.missing'                 = '不存在，首次运行会自动创建'
+    'doctor.persist.dual.name'             = 'Persist 双端安装'
+    'doctor.persist.dual.detail'           = '{0} 同时安装在 user 与 global：{1} | {2}'
+    'doctor.persist.empty.name'            = 'Persist 漂移'
+    'doctor.persist.empty.detail'          = '{0} intent 侧 persist 为空，另一侧有数据：{1} ← {2}；建议 link 时同步或 windots migrate'
 
     # --- 运行总结 ---
     'summary.title'                        = '=== 运行总结 ==='
