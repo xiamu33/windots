@@ -12,7 +12,7 @@ function Invoke-Link {
 
     $allItems = Get-SelectedPackageItems -State $State -PackagesDef $Ctx.Packages
     $extras = @($Ctx.Packages.Extras)
-    $planned = Get-PlannedLinks -RepoRoot $Ctx.Root -SelectedItems $allItems -Extras $extras
+    $planned = Get-PlannedLinks -RepoRoot $Ctx.Root -SelectedItems $allItems -Extras $extras -State $State -PackagesDef $Ctx.Packages
 
     $resolvedLinkMode = Resolve-LinkMode -RequestedMode ([string]$State.Link_Mode) -WhatIf:$Ctx.WhatIf
 

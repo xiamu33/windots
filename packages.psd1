@@ -23,8 +23,9 @@
 #
 # 重要：
 #   - Dest 路径写成字符串字面量，由脚本在运行时展开
-#   - 占位符：HOME\ APPDATA\ LOCAL_APPDATA\ SCOOP_ROOT\ SCOOP_GLOBAL\ PROFILE ...
-#   - glob 示例：Src='dotfiles/foo/*/bar.json' Dest='SCOOP_ROOT\persist\foo\*\bar.json'
+#   - 占位符：HOME\ APPDATA\ LOCAL_APPDATA\ SCOOP_ROOT\ SCOOP_GLOBAL\ SCOOP_PATH\ PROFILE ...
+#   - SCOOP_PATH\：按包 intent scope 自动选 user/global scoop 根（用于 persist\ 下配置）
+#   - glob 示例：Src='dotfiles/foo/*/bar.json' Dest='SCOOP_PATH\persist\foo\*\bar.json'
 #   - 此文件只允许字面量，不允许表达式（psd1 格式限制）
 # =====================================================================
 @{
@@ -177,8 +178,8 @@
                             Name     = 'flow-launcher'
                             Packages = 'extras/Flow-Launcher'
                             Dotfiles = @(
-                                @{ Src = 'dotfiles/flow-launcher/Settings/Settings.json'; Dest = 'SCOOP_ROOT\persist\Flow-Launcher\UserData\Settings\Settings.json' }
-                                @{ Src = 'dotfiles/flow-launcher/Settings/Plugins/*/Settings.json'; Dest = 'SCOOP_ROOT\persist\Flow-Launcher\UserData\Settings\Plugins\*\Settings.json' }
+                                @{ Src = 'dotfiles/flow-launcher/Settings/Settings.json'; Dest = 'SCOOP_PATH\persist\Flow-Launcher\UserData\Settings\Settings.json' }
+                                @{ Src = 'dotfiles/flow-launcher/Settings/Plugins/*/Settings.json'; Dest = 'SCOOP_PATH\persist\Flow-Launcher\UserData\Settings\Plugins\*\Settings.json' }
                             )
                         }
                         @{ Name = 'InputTip'; Packages = 'abyss/abgox.InputTip-zip' }

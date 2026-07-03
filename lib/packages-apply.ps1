@@ -120,6 +120,22 @@ function Get-PackageInstallGlobal {
     return [bool]$match.InstallGlobal
 }
 
+# 返回包 intent scope 对应的 scoop root（user 或 global）。
+# intent 解析复用 Get-PackageInstallGlobal 的既有顺序（state.Package_Global → state user 默认 → psd1 树继承）。
+# 用于 SCOOP_PATH\ Dest 占位符展开：链接目标跟随 intent scope，而非磁盘扫描的 user 优先结果。
+function Resolve-ScoopPathRoot {
+    param(
+        [Parameter(Mandatory)][hashtable] $PackagesDef,
+        [Parameter(Mandatory)][string]    $PackageName,
+        $State = $null
+    )
+
+    if (Get-PackageInstallGlobal -PackagesDef $PackagesDef -PackageName $PackageName -State $State) {
+        return Get-ScoopGlobalRoot
+    }
+    return Get-ScoopUserRoot
+}
+
 function Test-PackageItemScoopInstalledAtScope {
     param(
         [Parameter(Mandatory)]            $PackageItem,
@@ -642,7 +658,7 @@ function Apply-WindotsDotfiles {
     Write-Step (msg $StepKey)
     $allItems = Get-SelectedPackageItems -State $State -PackagesDef $Ctx.Packages
     $extras = @($Ctx.Packages.Extras)
-    $planned = Get-PlannedLinks -RepoRoot $Ctx.Root -SelectedItems $allItems -Extras $extras
+    $planned = Get-PlannedLinks -RepoRoot $Ctx.Root -SelectedItems $allItems -Extras $extras -State $State -PackagesDef $Ctx.Packages
 
     $resolvedLinkMode = Resolve-LinkMode -RequestedMode ([string]$State.Link_Mode) -WhatIf:$Ctx.WhatIf
 

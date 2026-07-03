@@ -18,8 +18,9 @@ function Resolve-RepoPath {
 }
 
 # packages.psd1 Dotfiles.Dest 占位符展开
-# 支持：HOME\  APPDATA\  LOCAL_APPDATA\  HOMEPATH\  SCOOP_ROOT\  SCOOP_GLOBAL\
+# 支持：HOME\  APPDATA\  LOCAL_APPDATA\  HOMEPATH\  SCOOP_ROOT\  SCOOP_GLOBAL\  SCOOP_PATH\
 #       PROFILE  PROFILE_CurrentUserAllHosts  PROFILE_ROOT\
+# SCOOP_PATH\：按包 intent scope 自动选 user/global scoop 根（需 -PackageName -State -PackagesDef）
 # Src/Dest glob: * matches one path segment; star count must match in Src and Dest
 function Test-DotfilesGlobPattern {
     param([Parameter(Mandatory)][string] $Path)
@@ -68,7 +69,10 @@ function Expand-DotfilesGlobEntry {
     param(
         [Parameter(Mandatory)][string] $SrcPattern,
         [Parameter(Mandatory)][string] $DestPattern,
-        [Parameter(Mandatory)][string] $RepoRoot
+        [Parameter(Mandatory)][string] $RepoRoot,
+        [string]  $PackageName = '',
+        $State = $null,
+        $PackagesDef = $null
     )
 
     $results = [System.Collections.Generic.List[object]]::new()
@@ -76,7 +80,7 @@ function Expand-DotfilesGlobEntry {
 
     if (-not (Test-DotfilesGlobPattern $srcNorm)) {
         $src = Resolve-RepoPath -RepoRoot $RepoRoot -Value $SrcPattern
-        $dest = Resolve-DestPath -Dest $DestPattern
+        $dest = Resolve-DestPath -Dest $DestPattern -PackageName $PackageName -State $State -PackagesDef $PackagesDef
         $results.Add([pscustomobject]@{ Src = $src; Dest = $dest })
         return $results.ToArray()
     }
@@ -87,7 +91,7 @@ function Expand-DotfilesGlobEntry {
     $globSuffix = $srcNorm.Substring($starIdx)
     $searchRoot = Join-Path $RepoRoot ($literalPrefix.TrimEnd('/') -replace '/', '\')
 
-    $destResolved = Resolve-DestPath -Dest $DestPattern
+    $destResolved = Resolve-DestPath -Dest $DestPattern -PackageName $PackageName -State $State -PackagesDef $PackagesDef
     if (-not (Test-DotfilesGlobPattern $destResolved)) {
         Write-Warn (msg 'links.glob.dest.mismatch' $DestPattern)
         return @()
@@ -126,12 +130,28 @@ function Expand-DotfilesGlobEntry {
 }
 
 function Resolve-DestPath {
-    param([Parameter(Mandatory)][string] $Dest)
+    param(
+        [Parameter(Mandatory)][string] $Dest,
+        [string]  $PackageName = '',
+        $State = $null,
+        $PackagesDef = $null
+    )
 
     if ($Dest -eq 'PROFILE') { return $PROFILE }
     if ($Dest -eq 'PROFILE_CurrentUserAllHosts') { return $PROFILE.CurrentUserAllHosts }
     if ($Dest.StartsWith('PROFILE_ROOT\')) { return Join-Path $PROFILE.Substring(0, $PROFILE.LastIndexOf('\') + 1) $Dest.Substring('PROFILE_ROOT\'.Length) }
 
+    # SCOOP_PATH\：按包 intent scope 选择 user/global scoop root（需 PackageName + PackagesDef 上下文）
+    # 无上下文时降级为 user root，与 SCOOP_ROOT 行为一致
+    if ($Dest -eq 'SCOOP_PATH') {
+        if ([string]::IsNullOrWhiteSpace($PackageName) -or $null -eq $PackagesDef) { return Get-ScoopUserRoot }
+        return Resolve-ScoopPathRoot -PackagesDef $PackagesDef -PackageName $PackageName -State $State
+    }
+    if ($Dest.StartsWith('SCOOP_PATH\')) {
+        $rest = $Dest.Substring('SCOOP_PATH\'.Length)
+        if ([string]::IsNullOrWhiteSpace($PackageName) -or $null -eq $PackagesDef) { return Join-Path (Get-ScoopUserRoot) $rest }
+        return Join-Path (Resolve-ScoopPathRoot -PackagesDef $PackagesDef -PackageName $PackageName -State $State) $rest
+    }
     if ($Dest -eq 'SCOOP_ROOT') { return Get-ScoopUserRoot }
     if ($Dest.StartsWith('SCOOP_ROOT\')) { return Join-Path (Get-ScoopUserRoot) $Dest.Substring('SCOOP_ROOT\'.Length) }
     if ($Dest -eq 'SCOOP_GLOBAL') { return Get-ScoopGlobalRoot }

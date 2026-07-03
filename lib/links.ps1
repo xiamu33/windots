@@ -32,14 +32,22 @@ function Add-PlannedDotfileLinks {
         [Parameter(Mandatory)] $Links,
         [Parameter(Mandatory)][string] $RepoRoot,
         [Parameter(Mandatory)] $Dot,
-        [string] $PackageName = ''
+        [string] $PackageName = '',
+        $State = $null,
+        $PackagesDef = $null
     )
 
     if ($null -eq $Dot) { return }
 
     $srcPattern = [string]$Dot.Src
     $destPattern = [string]$Dot.Dest
-    $expanded = @(Expand-DotfilesGlobEntry -SrcPattern $srcPattern -DestPattern $destPattern -RepoRoot $RepoRoot)
+    $expanded = @(Expand-DotfilesGlobEntry `
+        -SrcPattern $srcPattern `
+        -DestPattern $destPattern `
+        -RepoRoot $RepoRoot `
+        -PackageName $PackageName `
+        -State $State `
+        -PackagesDef $PackagesDef)
 
     if ($expanded.Count -eq 0 -and (Test-DotfilesGlobPattern $srcPattern)) {
         Write-Warn (msg 'links.glob.no.match' $srcPattern)
@@ -61,14 +69,16 @@ function Get-PlannedLinks {
     param(
         [Parameter(Mandatory)][string] $RepoRoot,
         [object[]] $SelectedItems = @(),
-        [object[]] $Extras = @()
+        [object[]] $Extras = @(),
+        $State = $null,
+        $PackagesDef = $null
     )
     $links = [System.Collections.Generic.List[object]]::new()
 
     foreach ($item in $SelectedItems) {
         if ((-not $item.Contains('Dotfiles')) -or ($null -eq $item.Dotfiles)) { continue }
         foreach ($dot in @($item.Dotfiles)) {
-            Add-PlannedDotfileLinks -Links $links -RepoRoot $RepoRoot -Dot $dot -PackageName ([string]$item.Name)
+            Add-PlannedDotfileLinks -Links $links -RepoRoot $RepoRoot -Dot $dot -PackageName ([string]$item.Name) -State $State -PackagesDef $PackagesDef
         }
     }
 
