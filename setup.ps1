@@ -12,6 +12,7 @@
 #   .\setup.ps1 migrate      # 单包 user↔global scope 迁移
 #   .\setup.ps1 clean        # 清理 logs；backup 保留最近一份；-All 清除全部 backup 与 state
 #   .\setup.ps1 link         # 重新应用配置文件链接
+#   .\setup.ps1 harvest      # 反向回收：把运行态 Dest 配置复制回 dotfiles Src（别名 hv）
 #   .\setup.ps1 doctor       # 环境健康检查
 #   .\setup.ps1 cd           # 进入 windots 项目目录
 # 参数：
@@ -23,6 +24,7 @@
 [CmdletBinding()]
 param(
     [string] $Command = '',
+    [string[]] $PackageNames = @(),
     [switch] $WhatIf,
     [switch] $Reconfigure,
     [switch] $All
@@ -94,6 +96,7 @@ $cmdAliases = @{
     'i'  = 'install'
     'up' = 'update'
     'rm' = 'uninstall'
+    'hv' = 'harvest'
 }
 if ($cmdAliases.ContainsKey($cmd)) {
     $cmd = $cmdAliases[$cmd]
@@ -123,6 +126,14 @@ switch ($cmd) {
             exit 1
         }
         Invoke-Link -Ctx $ctx -State $state
+        exit 0
+    }
+    'harvest' {
+        if (-not $state) {
+            Write-Err (msg 'setup.state.missing.err')
+            exit 1
+        }
+        Invoke-Harvest -Ctx $ctx -State $state -PackageNames $PackageNames
         exit 0
     }
     'install' {

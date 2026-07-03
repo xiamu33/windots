@@ -1,6 +1,6 @@
 @echo off
 :: windots.cmd - cmd.exe fallback (cd works natively; other commands delegate to setup.ps1)
-:: Usage: windots [init|install|i|uninstall|rm|update|up|migrate|clean|link|doctor|cd]
+:: Usage: windots [init|install|i|uninstall|rm|update|up|migrate|clean|link|harvest|hv|doctor|cd]
 :: Requires WINDOTS_ROOT env var pointing to the repo.
 if "%WINDOTS_ROOT%"=="" (
     echo [ERR] WINDOTS_ROOT not set. Please run setup.ps1 from the repo first.
