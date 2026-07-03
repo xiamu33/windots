@@ -137,11 +137,11 @@
         @{
             Title   = 'pkg.group.apps'
             Default = $false
-            Global  = $true
             Items   = @(
                 @{
-                    Title = 'pkg.group.apps.editor'
-                    Items = @(
+                    Title  = 'pkg.group.apps.editor'
+                    Global = $true
+                    Items  = @(
                         @{ Name = 'apifox'; Packages = 'extras/apifox' }
                         @{ Name = 'obsidian'; Packages = 'extras/obsidian' }
                         @{ Name = 'trae'; Packages = 'extras/trae' }
@@ -150,16 +150,18 @@
                     )
                 }
                 @{
-                    Title = 'pkg.group.apps.dev'
-                    Items = @(
+                    Title  = 'pkg.group.apps.dev'
+                    Global = $true
+                    Items  = @(
                         @{ Name = 'dbeaver'; Packages = 'extras/dbeaver' }
                         @{ Name = 'rider'; Packages = 'extras/rider' }
                         @{ Name = 'unigetui'; Packages = 'extras/unigetui' }
                     )
                 }
                 @{
-                    Title = 'pkg.group.apps.remote'
-                    Items = @(
+                    Title  = 'pkg.group.apps.remote'
+                    Global = $true
+                    Items  = @(
                         @{ Name = 'rustdesk'; Packages = 'extras/rustdesk' }
                         @{ Name = 'sunshine'; Packages = 'extras/sunshine' }
                         @{ Name = 'v2rayn'; Packages = 'extras/v2rayn' }
@@ -169,8 +171,8 @@
                     Title = 'pkg.group.apps.productivity'
                     Items = @(
                         @{ Name = 'altsnap'; Packages = 'extras/altsnap' }
-                        @{ Name = 'everything'; Packages = 'extras/everything' }
-                        @{ Name = 'everythingtoolbar'; Packages = 'extras/everythingtoolbar' }
+                        @{ Name = 'everything'; Packages = 'extras/everything'; Global = $true }
+                        @{ Name = 'everythingtoolbar'; Packages = 'extras/everythingtoolbar'; Global = $true }
                         @{
                             Name     = 'flow-launcher'
                             Packages = 'extras/Flow-Launcher'
@@ -181,7 +183,7 @@
                         }
                         @{ Name = 'InputTip'; Packages = 'abyss/abgox.InputTip-zip' }
                         @{ Name = 'pixpin'; Packages = 'abyss/PixPin.PixPin' }
-                        @{ Name = 'powertoys'; Packages = 'extras/powertoys' }
+                        @{ Name = 'powertoys'; Packages = 'extras/powertoys'; Global = $true }
                     )
                 }
                 @{
@@ -195,9 +197,8 @@
                     )
                 }
                 @{
-                    Title  = 'pkg.group.apps.wm'
-                    Global = $false
-                    Items  = @(
+                    Title = 'pkg.group.apps.wm'
+                    Items = @(
                         @{
                             Name     = 'glazewm'
                             Dotfiles = @(
