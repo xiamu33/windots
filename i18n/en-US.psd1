@@ -333,6 +333,10 @@
     # --- Link ---
     'link.title'                         = '=== windots link ==='
     'link.src.skip'                      = 'Source missing, skipping: {0}'
+    'link.persist.sync.prompt'           = '{0} intent-side persist is empty, other side has data. Sync {1} to {2}?'
+    'link.persist.sync.plan'             = '[WhatIf] would sync {0} persist: {1} -> {2}'
+    'link.persist.sync.done'             = 'synced {0} persist: {1} -> {2}'
+    'link.persist.sync.skipped'          = 'skipped {0} persist sync, continuing with intent scope link'
 
     # --- Main flow ---
     'setup.ps7.required'                = "Windots setup requires PowerShell 7+ (pwsh).`nRun install.ps1 first, or: pwsh -File setup.ps1"

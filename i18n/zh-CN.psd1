@@ -333,6 +333,10 @@
     # --- 链接重建 ---
     'link.title'                           = '=== windots link ==='
     'link.src.skip'                        = '源不存在，跳过：{0}'
+    'link.persist.sync.prompt'             = '检测到 {0} 的 intent 侧 persist 为空，另一侧有数据。是否将 {1} 同步到 {2}？'
+    'link.persist.sync.plan'               = '[WhatIf] 将同步 {0} persist：{1} → {2}'
+    'link.persist.sync.done'               = '已同步 {0} persist：{1} → {2}'
+    'link.persist.sync.skipped'            = '已跳过 {0} persist 同步，按 intent scope 继续链接'
 
     # --- 主流程 ---
     'setup.ps7.required'                   = "Windots setup 需要 PowerShell 7+（pwsh）。`n请先运行 install.ps1，或使用：pwsh -File setup.ps1"

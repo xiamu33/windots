@@ -188,6 +188,55 @@ function Get-PackagePersistDrift {
     return @($results)
 }
 
+# Persist 可选同步：在 link/init/install 应用 Dotfiles 前调用。
+# 对选中且 Dotfiles 含 SCOOP_PATH 的包，复用 Get-PackagePersistDrift；
+# 命中 PersistDrift（intent 侧空 + 另一侧有数据）时：
+#   - -WhatIf：仅打印同步计划，不交互、不复制
+#   - 正常：Read-YesNo 提示；同意则把另一侧 persist 复制到 intent 侧；拒绝则跳过继续
+# 同步是可选交互，不阻塞流程；migrate 不内嵌本逻辑（职责分离）。
+function Invoke-PersistDriftSync {
+    param(
+        [Parameter(Mandatory)][pscustomobject] $Ctx,
+        [Parameter(Mandatory)]                 $State
+    )
+
+    $allItems = Get-SelectedPackageItems -State $State -PackagesDef $Ctx.Packages
+    foreach ($item in $allItems) {
+        if (-not $item.Contains('Dotfiles') -or $null -eq $item.Dotfiles) { continue }
+        $hasScoopPath = $false
+        foreach ($dot in @($item.Dotfiles)) {
+            if ([string]$dot.Dest -like 'SCOOP_PATH*') { $hasScoopPath = $true; break }
+        }
+        if (-not $hasScoopPath) { continue }
+
+        $drifts = Get-PackagePersistDrift -PackagesDef $Ctx.Packages -PackageName ([string]$item.Name) -State $State
+        foreach ($d in $drifts) {
+            if (-not $d.PersistDrift) { continue }
+
+            if ($Ctx.WhatIf) {
+                Write-Info (msg 'link.persist.sync.plan' $d.App $d.OtherPersist $d.IntentPersist)
+                continue
+            }
+
+            $yes = Read-YesNo -Prompt (msg 'link.persist.sync.prompt' $d.App $d.OtherPersist $d.IntentPersist) -Default $true
+            if (-not $yes) {
+                Write-Info (msg 'link.persist.sync.skipped' $d.App)
+                continue
+            }
+
+            if (Test-Path -LiteralPath $d.IntentPersist) {
+                Copy-Item -Path (Join-Path $d.OtherPersist '*') -Destination $d.IntentPersist -Recurse -Force
+            }
+            else {
+                $parent = Split-Path $d.IntentPersist -Parent
+                if (-not (Test-Path $parent)) { New-Item -ItemType Directory -Force -Path $parent | Out-Null }
+                Copy-Item -LiteralPath $d.OtherPersist -Destination $d.IntentPersist -Recurse -Force
+            }
+            Write-Info (msg 'link.persist.sync.done' $d.App $d.OtherPersist $d.IntentPersist)
+        }
+    }
+}
+
 function Test-PackageItemScoopInstalledAtScope {
     param(
         [Parameter(Mandatory)]            $PackageItem,
@@ -709,6 +758,7 @@ function Apply-WindotsDotfiles {
 
     Write-Step (msg $StepKey)
     $allItems = Get-SelectedPackageItems -State $State -PackagesDef $Ctx.Packages
+    Invoke-PersistDriftSync -Ctx $Ctx -State $State
     $extras = @($Ctx.Packages.Extras)
     $planned = Get-PlannedLinks -RepoRoot $Ctx.Root -SelectedItems $allItems -Extras $extras -State $State -PackagesDef $Ctx.Packages
 

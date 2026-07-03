@@ -11,6 +11,7 @@ function Invoke-Link {
     Write-Step (msg 'link.title')
 
     $allItems = Get-SelectedPackageItems -State $State -PackagesDef $Ctx.Packages
+    Invoke-PersistDriftSync -Ctx $Ctx -State $State
     $extras = @($Ctx.Packages.Extras)
     $planned = Get-PlannedLinks -RepoRoot $Ctx.Root -SelectedItems $allItems -Extras $extras -State $State -PackagesDef $Ctx.Packages
 
