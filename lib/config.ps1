@@ -32,8 +32,14 @@ function Convert-DotfilesGlobToRegex {
 
     $sb = [System.Text.StringBuilder]::new()
     [void]$sb.Append('^')
-    for ($i = 0; $i -lt $Glob.Length; $i++) {
+    $i = 0
+    while ($i -lt $Glob.Length) {
         $c = $Glob[$i]
+        if ($c -eq '*' -and ($i + 1) -lt $Glob.Length -and $Glob[$i + 1] -eq '*') {
+            [void]$sb.Append('(.*)')
+            $i += 2
+            continue
+        }
         switch ($c) {
             '*' { [void]$sb.Append('([^\\/]*)') }
             '?' { [void]$sb.Append('[^\\/]') }
@@ -43,24 +49,42 @@ function Convert-DotfilesGlobToRegex {
                 [void]$sb.Append([regex]::Escape([string]$c))
             }
         }
+        $i++
     }
     [void]$sb.Append('$')
     return $sb.ToString()
+}
+
+function Get-DotfilesGlobUnitCount {
+    param([Parameter(Mandatory)][string] $Glob)
+    return ([regex]::Matches($Glob, '\*\*|\*|\?')).Count
 }
 
 function Merge-DotfilesGlobDest {
     param(
         [Parameter(Mandatory)][string] $LiteralPrefix,
         [Parameter(Mandatory)][string] $GlobSuffix,
-        [Parameter(Mandatory)][string[]] $Captures
+        [string[]] $Captures
     )
 
-    $parts = $GlobSuffix -split '\*', [System.StringSplitOptions]::None
+    if ($null -eq $Captures) { $Captures = @() }
     $sb = [System.Text.StringBuilder]::new()
     [void]$sb.Append($LiteralPrefix)
-    for ($i = 0; $i -lt $parts.Length; $i++) {
-        [void]$sb.Append($parts[$i])
-        if ($i -lt $Captures.Length) { [void]$sb.Append($Captures[$i]) }
+    $unitMatches = [regex]::Matches($GlobSuffix, '\*\*|\*|\?')
+    $lastEnd = 0
+    $capIdx = 0
+    foreach ($m in $unitMatches) {
+        if ($m.Index -gt $lastEnd) {
+            [void]$sb.Append($GlobSuffix.Substring($lastEnd, $m.Index - $lastEnd))
+        }
+        if ($capIdx -lt $Captures.Length) {
+            [void]$sb.Append([string]$Captures[$capIdx])
+            $capIdx++
+        }
+        $lastEnd = $m.Index + $m.Length
+    }
+    if ($lastEnd -lt $GlobSuffix.Length) {
+        [void]$sb.Append($GlobSuffix.Substring($lastEnd))
     }
     return $sb.ToString()
 }
@@ -102,8 +126,8 @@ function Expand-DotfilesGlobEntry {
     $destLiteralPrefix = $destResolved.Substring(0, $destStarIdx)
     $destGlobSuffix = $destResolved.Substring($destStarIdx)
 
-    $srcStars = ([regex]::Matches($globSuffix, '\*')).Count
-    $destStars = ([regex]::Matches($destGlobSuffix, '\*')).Count
+    $srcStars = Get-DotfilesGlobUnitCount -Glob $globSuffix
+    $destStars = Get-DotfilesGlobUnitCount -Glob $destGlobSuffix
     if ($srcStars -ne $destStars) {
         Write-Warn (msg 'links.glob.star.mismatch' $SrcPattern $DestPattern)
         return @()
@@ -117,9 +141,9 @@ function Expand-DotfilesGlobEntry {
         $m = [regex]::Match($rel, $globRegex)
         if (-not $m.Success) { return }
 
-        $captures = [string[]]@()
+        $captures = [System.Collections.Generic.List[string]]::new()
         for ($g = 1; $g -lt $m.Groups.Count; $g++) {
-            $captures += $m.Groups[$g].Value
+            $captures.Add($m.Groups[$g].Value)
         }
 
         $dest = Merge-DotfilesGlobDest -LiteralPrefix $destLiteralPrefix -GlobSuffix $destGlobSuffix -Captures $captures

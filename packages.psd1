@@ -19,13 +19,13 @@
 #   Default  - 可选；覆盖分组 Default
 #   Global   - 可选；为 $true 时 scoop install/uninstall 使用 -g（全局安装）
 #   Packages - 可选；实际 scoop 安装名（字符串或数组）
-#   Dotfiles - 可选；@{ Src='...'; Dest='...' } 或数组；Src/Dest 支持 glob（* ?）
+#   Dotfiles - 可选；@{ Src='...'; Dest='...' } 或数组；Src/Dest 支持 glob（* ? **）
 #
 # 重要：
 #   - Dest 路径写成字符串字面量，由脚本在运行时展开
 #   - 占位符：HOME\ APPDATA\ LOCAL_APPDATA\ SCOOP_ROOT\ SCOOP_GLOBAL\ SCOOP_PATH\ PROFILE ...
 #   - SCOOP_PATH\：按包 intent scope 自动选 user/global scoop 根（用于 persist\ 下配置）
-#   - glob 示例：Src='dotfiles/foo/*/bar.json' Dest='SCOOP_PATH\persist\foo\*\bar.json'
+#   - glob 示例：Src='dotfiles/foo/**/*/bar.json' Dest='SCOOP_PATH\persist\foo\**\*\bar.json'
 #   - 此文件只允许字面量，不允许表达式（psd1 格式限制）
 # =====================================================================
 @{
@@ -239,8 +239,6 @@
 
     Extras          = @(
         @{ Src = 'dotfiles/powershell/Profile.ps1'; Dest = 'PROFILE' }
-        @{ Src = 'dotfiles/powershell/init'; Dest = 'PROFILE_ROOT\init' }
-        @{ Src = 'dotfiles/powershell/functions'; Dest = 'PROFILE_ROOT\functions' }
-        @{ Src = 'dotfiles/powershell/aliases'; Dest = 'PROFILE_ROOT\aliases' }
+        @{ Src = 'dotfiles/powershell/**/*.ps1'; Dest = 'PROFILE_ROOT\**\*.ps1' }
     )
 }
