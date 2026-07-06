@@ -43,19 +43,19 @@ function script:Register-AbbrCompletion {
       $prefix = $Matches[1]
       $abbrMatches = @(
         $global:ProfileAbbr.GetEnumerator() |
-          Where-Object { $_.Key -like "${prefix}*" } |
-          Sort-Object Key
+        Where-Object { $_.Key -like "${prefix}*" } |
+        Sort-Object Key
       )
       if ($abbrMatches.Count -gt 0) {
         $results = [System.Collections.ObjectModel.Collection[System.Management.Automation.CompletionResult]]::new()
         foreach ($item in $abbrMatches) {
           $desc = if ($item.Value -is [hashtable]) { $item.Value.Description } else { [string]$item.Value }
           $null = $results.Add([System.Management.Automation.CompletionResult]::new(
-            $item.Key,
-            $item.Key,
-            [System.Management.Automation.CompletionResultType]::Command,
-            $desc
-          ))
+              $item.Key,
+              $item.Key,
+              [System.Management.Automation.CompletionResultType]::Command,
+              $desc
+            ))
         }
         return [System.Management.Automation.CommandCompletion]::new($results, -1, 0, $prefix.Length)
       }
@@ -65,8 +65,10 @@ function script:Register-AbbrCompletion {
 }
 
 if (-not $global:AbbrHandlerRegistered) {
-  Import-Module PSReadLine -ErrorAction SilentlyContinue
-  if (Get-Module PSReadLine) {
+  if (-not (Get-Module PSReadLine -ErrorAction SilentlyContinue)) {
+    Import-Module PSReadLine -ErrorAction SilentlyContinue
+  }
+  if (Get-Module PSReadLine -ErrorAction SilentlyContinue) {
     Set-PSReadLineKeyHandler -Chord 'Spacebar' -BriefDescription 'Expand-Abbr' -ScriptBlock {
       param($key, $arg)
       $line = $null
