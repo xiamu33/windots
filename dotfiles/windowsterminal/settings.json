@@ -2,8 +2,24 @@
     "$help": "https://aka.ms/terminal-documentation",
     "$schema": "https://aka.ms/terminal-profiles-schema",
     "actions": [],
-    "defaultProfile": "{61c54bbd-c2c6-5271-96e7-009a87ff44bf}",
-    "keybindings": [],
+    "copyFormatting": "none",
+    "copyOnSelect": false,
+    "defaultProfile": "{574e775e-4f2a-5b96-ac1e-a2962a402336}",
+    "keybindings": 
+    [
+        {
+            "id": "Terminal.CopyToClipboard",
+            "keys": "ctrl+c"
+        },
+        {
+            "id": "Terminal.PasteFromClipboard",
+            "keys": "ctrl+v"
+        },
+        {
+            "id": "Terminal.DuplicatePaneAuto",
+            "keys": "alt+shift+d"
+        }
+    ],
     "newTabMenu": 
     [
         {
@@ -12,27 +28,131 @@
     ],
     "profiles": 
     {
-        "defaults": {},
+        "defaults": 
+        {
+            "backgroundImage": "D:\\Pictures\\wallpaper\\\u3010\u54f2\u98ce\u58c1\u7eb8\u3011eva-\u51cc\u6ce2\u4e3d.png",
+            "backgroundImageOpacity": 0.33,
+            "font": 
+            {
+                "face": "MesloLGS Nerd Font Mono",
+                "size": 11
+            },
+            "opacity": 88,
+            "useAcrylic": true
+        },
         "list": 
         [
             {
+                "commandline": "%SystemRoot%\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
                 "guid": "{61c54bbd-c2c6-5271-96e7-009a87ff44bf}",
                 "hidden": false,
                 "name": "Windows PowerShell"
             },
             {
+                "commandline": "%SystemRoot%\\System32\\cmd.exe",
                 "guid": "{0caa0dad-35be-5f56-a8ff-afceeeaa6101}",
                 "hidden": false,
-                "name": "Command Prompt"
+                "name": "\u547d\u4ee4\u63d0\u793a\u7b26"
             },
             {
                 "guid": "{574e775e-4f2a-5b96-ac1e-a2962a402336}",
                 "hidden": false,
                 "name": "PowerShell",
                 "source": "Windows.Terminal.PowershellCore"
+            },
+            {
+                "guid": "{b453ae62-4e3d-5e58-b989-0a998ec441b8}",
+                "hidden": false,
+                "name": "Azure Cloud Shell",
+                "source": "Windows.Terminal.Azure"
+            },
+            {
+                "guid": "{78797e82-65ca-5fe6-a4ea-1660912e139f}",
+                "hidden": false,
+                "name": "Developer Command Prompt for VS 18 (2)",
+                "source": "Windows.Terminal.VisualStudio"
+            },
+            {
+                "guid": "{f912a278-3898-5fbb-ac97-4cf1c0e11c78}",
+                "hidden": false,
+                "name": "Developer PowerShell for VS 18 (2)",
+                "source": "Windows.Terminal.VisualStudio"
+            },
+            {
+                "guid": "{02185302-2e22-5cf5-9c75-7752dcddf979}",
+                "hidden": true,
+                "name": "Developer Command Prompt for VS 18",
+                "source": "Windows.Terminal.VisualStudio"
+            },
+            {
+                "guid": "{4c09fb44-9cce-5b41-9d71-fe6bf77ff231}",
+                "hidden": true,
+                "name": "Developer PowerShell for VS 18",
+                "source": "Windows.Terminal.VisualStudio"
+            },
+            {
+                "guid": "{742bedcd-e0e1-52ad-a7e3-68b82ccde32e}",
+                "hidden": true,
+                "name": "Developer Command Prompt for VS 2022",
+                "source": "Windows.Terminal.VisualStudio"
+            },
+            {
+                "guid": "{e2feb821-9f9e-514b-b48f-cf5f71b745e3}",
+                "hidden": true,
+                "name": "Developer PowerShell for VS 2022",
+                "source": "Windows.Terminal.VisualStudio"
+            },
+            {
+                "guid": "{0b2bb4d2-7334-58d9-8b1f-46ff58e7d756}",
+                "hidden": true,
+                "name": "Developer Command Prompt for VS 2019 (2)",
+                "source": "Windows.Terminal.VisualStudio"
+            },
+            {
+                "guid": "{2c17c48c-2208-5783-af87-1811a01a9ebf}",
+                "hidden": true,
+                "name": "Developer PowerShell for VS 2019 (2)",
+                "source": "Windows.Terminal.VisualStudio"
+            },
+            {
+                "guid": "{9aa0d028-c7b9-5fff-8493-fd32ae3a2ca1}",
+                "hidden": true,
+                "name": "Developer Command Prompt for VS 2019",
+                "source": "Windows.Terminal.VisualStudio"
+            },
+            {
+                "guid": "{9b00d124-b22d-570b-8e08-9acd71f395bf}",
+                "hidden": true,
+                "name": "Developer PowerShell for VS 2019",
+                "source": "Windows.Terminal.VisualStudio"
+            },
+            {
+                "guid": "{04f8df9a-80b6-53c1-83f6-76fba14e9553}",
+                "hidden": false,
+                "name": "fedora",
+                "source": "Microsoft.WSL"
+            },
+            {
+                "guid": "{05c06e19-a636-565b-b524-bbfe5bdfaf6c}",
+                "hidden": false,
+                "name": "Ubuntu-24.04",
+                "source": "Microsoft.WSL"
+            },
+            {
+                "guid": "{603d213e-2c3b-5ca1-b37a-4fdd11d7023d}",
+                "hidden": false,
+                "name": "fedora-43",
+                "source": "Microsoft.WSL"
+            },
+            {
+                "guid": "{85919d59-031f-520e-a3c6-43a026be7edc}",
+                "hidden": false,
+                "name": "arch-linux-current",
+                "source": "Microsoft.WSL"
             }
         ]
     },
     "schemes": [],
-    "themes": []
+    "themes": [],
+    "warning.confirmCloseAllTabs": false
 }
