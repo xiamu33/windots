@@ -425,7 +425,9 @@ function Get-PackageItemScoopApps {
 function Get-ScoopAppsForPackageNames {
     param(
         [Parameter(Mandatory)][hashtable] $PackagesDef,
-        [Parameter(Mandatory)][string[]] $PackageNames
+        [Parameter(Mandatory)]
+        [AllowEmptyCollection()]
+        [string[]]                        $PackageNames
     )
 
     $apps = [System.Collections.Generic.List[string]]::new()
@@ -551,8 +553,12 @@ function Update-WindotsUninstallState {
 function Get-UninstallScoopPlan {
     param(
         [Parameter(Mandatory)][hashtable] $PackagesDef,
-        [Parameter(Mandatory)][string[]] $RemovedPackageNames,
-        [Parameter(Mandatory)][string[]] $RemainingPackageNames
+        [Parameter(Mandatory)]
+        [AllowEmptyCollection()]
+        [string[]]                        $RemovedPackageNames,
+        [Parameter(Mandatory)]
+        [AllowEmptyCollection()]
+        [string[]]                        $RemainingPackageNames
     )
 
     if (@($RemovedPackageNames).Count -eq 0) {
@@ -619,8 +625,12 @@ function Get-UninstallScoopPlan {
 function Get-ScoopAppsToUninstall {
     param(
         [Parameter(Mandatory)][hashtable] $PackagesDef,
-        [Parameter(Mandatory)][string[]] $RemovedPackageNames,
-        [Parameter(Mandatory)][string[]] $RemainingPackageNames
+        [Parameter(Mandatory)]
+        [AllowEmptyCollection()]
+        [string[]]                        $RemovedPackageNames,
+        [Parameter(Mandatory)]
+        [AllowEmptyCollection()]
+        [string[]]                        $RemainingPackageNames
     )
 
     return (Get-UninstallScoopPlan -PackagesDef $PackagesDef `

@@ -1044,6 +1044,27 @@ function Get-SeqColumnWidth {
     return [Math]::Max(1, ([string]$RowCount).Length)
 }
 
+function Get-DisplayTableRowCells {
+    param($Row)
+    # string 必须整格保留：勿把 [string] 当 [string[]]，否则会按字符拆列
+    if ($null -eq $Row) { return [string[]]@() }
+    if ($Row -is [string]) { return [string[]]@([string]$Row) }
+    if ($Row -is [string[]]) { return [string[]]$Row }
+    if ($Row -is [System.Collections.IEnumerable]) {
+        return [string[]]@(@($Row) | ForEach-Object { [string]$_ })
+    }
+    return [string[]]@([string]$Row)
+}
+
+function Get-DisplayTableCellAt {
+    param(
+        [string[]] $Cells,
+        [int]      $Index
+    )
+    if ($null -eq $Cells -or $Index -lt 0 -or $Index -ge $Cells.Length) { return '' }
+    return [string]$Cells[$Index]
+}
+
 function Resolve-DisplayTableColumns {
     param(
         [object[]] $Columns,
@@ -1072,10 +1093,10 @@ function Resolve-DisplayTableColumns {
         if (-not $item.AutoWidth) { continue }
         $maxW = Get-DisplayWidth $item.Header
         foreach ($row in $Rows) {
-            $cells = if ($row -is [string[]]) { $row } else { @([string]$row) }
+            $cells = Get-DisplayTableRowCells -Row $row
             $idx = [int]$item.Index
-            if ($idx -ge @($cells).Count) { continue }
-            $w = Get-DisplayWidth ([string]$cells[$idx])
+            if ($idx -ge $cells.Length) { continue }
+            $w = Get-DisplayWidth (Get-DisplayTableCellAt -Cells $cells -Index $idx)
             if ($w -gt $maxW) { $maxW = $w }
         }
         $item.Width = [Math]::Max($maxW, 2)
@@ -1139,13 +1160,13 @@ function Expand-WrappedTableRows {
     $expanded = [System.Collections.Generic.List[object]]::new()
 
     foreach ($row in $Rows) {
-        $cells = if ($row -is [string[]]) { $row } else { @([string[]]$row) }
+        $cells = Get-DisplayTableRowCells -Row $row
         $wrapped = @{}
         $maxLines = 1
 
         foreach ($col in $Columns) {
             $idx = [int]$col.Index
-            $text = [string]$cells[$idx]
+            $text = Get-DisplayTableCellAt -Cells $cells -Index $idx
             if ($col.Wrap -and -not [string]::IsNullOrEmpty($text)) {
                 if ($col.CommaWrap) {
                     $lines = @(Split-DisplayTextLines -Text $text -Width $col.Width -CommaBreak)
@@ -1206,7 +1227,7 @@ function Format-DisplayTable {
     else {
         $logicalGroups = [System.Collections.Generic.List[object]]::new()
         foreach ($row in $Rows) {
-            $cells = if ($row -is [string[]]) { $row } else { @([string[]]$row) }
+            $cells = Get-DisplayTableRowCells -Row $row
             $lineGroup = [System.Collections.Generic.List[string[]]]::new()
             [void]$lineGroup.Add($cells)
             [void]$logicalGroups.Add($lineGroup)
@@ -1224,22 +1245,13 @@ function Format-DisplayTable {
         return $Left + ($parts -join $Join) + $Right
     }
 
-    function Get-TableCell {
-        param(
-            [string[]] $Cells,
-            [int]      $Index
-        )
-        if ($null -eq $Cells -or $Index -lt 0 -or $Index -ge @($Cells).Count) { return '' }
-        return [string]$Cells[$Index]
-    }
-
     function Get-TableDataLine {
         param([string[]] $Cells)
         $line = [System.Text.StringBuilder]::new()
         [void]$line.Append($v)
         for ($i = 0; $i -lt $colDefs.Count; $i++) {
             $idx = [int]$colDefs[$i].Index
-            $cell = Pad-DisplayTextRaw -Text (Get-TableCell -Cells $Cells -Index $idx) -Width $colDefs[$i].Width
+            $cell = Pad-DisplayTextRaw -Text (Get-DisplayTableCellAt -Cells $Cells -Index $idx) -Width $colDefs[$i].Width
             [void]$line.Append(" $cell $v")
         }
         return $line.ToString()
@@ -1390,7 +1402,8 @@ function Build-PackageListTableRows {
         $seq++
     }
 
-    return @($tableRows)
+    # 一元逗号：仅 1 行时避免管道展开 string[]，否则单元格会被拆成多行并触发越界/乱表
+    return , $tableRows.ToArray()
 }
 
 function Write-PackageListScopeSection {
@@ -1496,7 +1509,7 @@ function Write-PackageList {
                 [void]$rows.Add(@([string]$seq, (Get-ScoopAppBaseName -Name ([string]$app))))
                 $seq++
             }
-            $rowArr = @($rows)
+            $rowArr = $rows.ToArray()
             $cols = @(
                 @{ Header = (msg 'ui.packages.col.no'); Index = 0; FixedWidth = (Get-SeqColumnWidth -RowCount $rows.Count); FirstLineOnly = $true }
                 @{ Header = (msg 'ui.packages.col.name.user'); Index = 1; AutoWidth = $true; FirstLineOnly = $true }
@@ -1511,7 +1524,7 @@ function Write-PackageList {
                 [void]$rows.Add(@([string]$seq, (Get-ScoopAppBaseName -Name ([string]$app))))
                 $seq++
             }
-            $rowArr = @($rows)
+            $rowArr = $rows.ToArray()
             $cols = @(
                 @{ Header = (msg 'ui.packages.col.no'); Index = 0; FixedWidth = (Get-SeqColumnWidth -RowCount $rows.Count); FirstLineOnly = $true }
                 @{ Header = (msg 'ui.packages.col.name.global'); Index = 1; AutoWidth = $true; FirstLineOnly = $true }
