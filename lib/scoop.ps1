@@ -60,11 +60,11 @@ function Resolve-ScoopConfigPathValue {
     $v = $Value.Trim()
     if ($v -match '(?i)\$env:') {
         $v = [regex]::Replace($v, '(?i)\$env:([^\\/]+)', {
-            param($m)
-            $ev = [Environment]::GetEnvironmentVariable($m.Groups[1].Value)
-            if ([string]::IsNullOrEmpty($ev)) { return $m.Value }
-            return $ev
-        })
+                param($m)
+                $ev = [Environment]::GetEnvironmentVariable($m.Groups[1].Value)
+                if ([string]::IsNullOrEmpty($ev)) { return $m.Value }
+                return $ev
+            })
     }
     if ($v -match '^~[\\/]') {
         return $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($v)
@@ -244,7 +244,14 @@ function Install-Scoop {
         return (New-ScoopStepResult -Status 'ok' -Detail (msg 'summary.detail.whatif'))
     }
     Write-Info (msg 'scoop.installing' $srcUrl)
-    Invoke-Expression (Invoke-RestMethod -Uri $srcUrl)
+    # scoop install.ps1 会向成功流输出对象；若不丢弃，Install-Scoop 返回值会被污染，调用方读 .Status 失败
+    try {
+        $null = Invoke-Expression (Invoke-RestMethod -Uri $srcUrl)
+    }
+    catch {
+        Write-Err $_.Exception.Message
+        return (New-ScoopStepResult -Status 'failed' -Detail (msg 'summary.detail.scoop.fail'))
+    }
     Update-SessionPath
     if (Test-CommandExists -Name 'scoop') {
         return (New-ScoopStepResult -Status 'ok' -Detail (msg 'summary.detail.scoop.ok'))
@@ -288,9 +295,9 @@ function Switch-ScoopMirror {
     }
 
     Write-Info (msg 'scoop.mirror.switching')
-    & scoop update
-    & scoop bucket rm main 2>$null
-    & scoop bucket add main
+    & scoop update | Out-Null
+    & scoop bucket rm main 2>$null | Out-Null
+    & scoop bucket add main | Out-Null
     $Global:WindotsBucketList = $null
 
     Write-Success (msg 'scoop.mirror.done')
@@ -342,8 +349,8 @@ function Install-ScoopBuckets {
         }
 
         Write-Info (msg 'scoop.bucket.adding' $name)
-        if ($url) { & scoop bucket add $name $url }
-        else { & scoop bucket add $name }
+        if ($url) { & scoop bucket add $name $url | Out-Null }
+        else { & scoop bucket add $name | Out-Null }
         $Global:WindotsBucketList = $null
         $added++
     }
