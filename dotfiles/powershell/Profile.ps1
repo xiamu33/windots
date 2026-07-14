@@ -9,9 +9,5 @@ function script:Import-ProfileDir {
 }
 
 Import-ProfileDir 'functions'
-. (Join-Path $ProfileRoot 'init/tools.ps1')
-. (Join-Path $ProfileRoot 'init/psreadline.ps1')
 Import-ProfileDir 'aliases'
-Import-ProfileDir 'abbr'
-
-. (Join-Path $ProfileRoot 'init/completions.ps1')
+Import-ProfileDir 'init'
