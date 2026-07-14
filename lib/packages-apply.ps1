@@ -50,7 +50,7 @@ function Get-ResolvedPackageGlobal {
 function Get-StatePackageGlobalNames {
     param($State)
 
-    if ($null -eq $State) { return @() }
+    if ($null -eq $State) { return , [string[]]@() }
     $pg = $null
     if ($State -is [hashtable] -and $State.Contains('Package_Global')) {
         $pg = $State['Package_Global']
@@ -58,12 +58,12 @@ function Get-StatePackageGlobalNames {
     elseif ($null -ne $State.PSObject.Properties['Package_Global']) {
         $pg = $State.Package_Global
     }
-    if ($null -eq $pg) { return @() }
+    if ($null -eq $pg) { return , [string[]]@() }
 
     if ($pg -is [hashtable]) {
-        return @($pg.Keys | Where-Object { [bool]$pg[$_] } | ForEach-Object { [string]$_ })
+        return , (ConvertTo-WindotsStringArray ($pg.Keys | Where-Object { [bool]$pg[$_] }))
     }
-    return @($pg | ForEach-Object { [string]$_ } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+    return , (ConvertTo-WindotsStringArray $pg)
 }
 
 function Test-StateHasPackageScopeConfigured {
@@ -79,7 +79,7 @@ function Test-StateHasPackageScopeConfigured {
 function Get-StateSelectedPackageNames {
     param($State)
 
-    if ($null -eq $State) { return @() }
+    if ($null -eq $State) { return , [string[]]@() }
     $selected = $null
     if ($State -is [System.Collections.IDictionary] -and $State.Contains('Selected_Packages')) {
         $selected = $State['Selected_Packages']
@@ -87,8 +87,8 @@ function Get-StateSelectedPackageNames {
     elseif ($null -ne $State.PSObject.Properties['Selected_Packages']) {
         $selected = $State.Selected_Packages
     }
-    if ($null -eq $selected) { return @() }
-    return @($selected | ForEach-Object { [string]$_ } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+    if ($null -eq $selected) { return , [string[]]@() }
+    return , (ConvertTo-WindotsStringArray $selected)
 }
 
 function Get-PackageInstallGlobal {
@@ -366,17 +366,17 @@ function Remove-StatePackageGlobalEntries {
         [string[]]                        $PackageNames
     )
 
-    if (@($PackageNames).Count -eq 0) { return }
+    if ((Get-WindotsCount $PackageNames) -eq 0) { return }
     $names = Get-StatePackageGlobalNames -State $State
-    if ($names.Count -eq 0) { return }
-    $updated = @($names | Where-Object { $PackageNames -notcontains [string]$_ })
-    if ($updated.Count -eq 0) {
+    if ((Get-WindotsCount $names) -eq 0) { return }
+    $updated = ConvertTo-WindotsStringArray ($names | Where-Object { $PackageNames -notcontains [string]$_ })
+    if ((Get-WindotsCount $updated) -eq 0) {
         if ($State -is [hashtable] -and $State.Contains('Package_Global')) {
             $State.Remove('Package_Global')
         }
     }
     else {
-        $State['Package_Global'] = $updated
+        $State['Package_Global'] = [string[]]$updated
     }
 }
 
@@ -438,7 +438,7 @@ function Get-ScoopAppsForPackageNames {
             }
         }
     }
-    return [string[]]@($apps)
+    return , [string[]]@($apps)
 }
 
 function Get-PackagesPlannedForRemoval {
@@ -465,7 +465,7 @@ function Get-PackagesPlannedForRemoval {
             }
         }
     }
-    return [string[]]@($planned)
+    return , [string[]]@($planned)
 }
 
 function Get-PackagesActuallyUninstalled {
@@ -510,7 +510,7 @@ function Get-PackagesActuallyUninstalled {
             $removed.Add([string]$name)
         }
     }
-    return [string[]]@($removed)
+    return , [string[]]@($removed)
 }
 
 function Update-WindotsUninstallState {
@@ -531,23 +531,24 @@ function Update-WindotsUninstallState {
         [object[]]                               $UninstallResults
     )
 
-    $removed = Get-PackagesActuallyUninstalled -PackagesDef $PackagesDef `
-        -CandidatePackageNames $CandidatePackageNames `
-        -AppsToUninstall $AppsToUninstall `
-        -UninstallResults $UninstallResults
+    $removed = ConvertTo-WindotsStringArray (Get-PackagesActuallyUninstalled -PackagesDef $PackagesDef `
+            -CandidatePackageNames $CandidatePackageNames `
+            -AppsToUninstall $AppsToUninstall `
+            -UninstallResults $UninstallResults)
 
     $finalRemaining = [System.Collections.Generic.List[string]]::new()
-    foreach ($n in @($BaseSelectedPackages | ForEach-Object { [string]$_ })) {
+    foreach ($n in (ConvertTo-WindotsStringArray $BaseSelectedPackages)) {
         if ($removed -notcontains $n) {
             if (-not $finalRemaining.Contains($n)) { $finalRemaining.Add($n) }
         }
     }
 
     $State['Selected_Packages'] = [string[]]@($finalRemaining)
-    $State['Scoop_Apps'] = Get-ScoopAppsForPackageNames -PackagesDef $PackagesDef -PackageNames $State['Selected_Packages']
-    Remove-StatePackageGlobalEntries -State $State -PackageNames @($removed)
+    $State['Scoop_Apps'] = Get-ScoopAppsForPackageNames -PackagesDef $PackagesDef `
+        -PackageNames (ConvertTo-WindotsStringArray $State['Selected_Packages'])
+    Remove-StatePackageGlobalEntries -State $State -PackageNames $removed
     $State['Timestamp'] = (Get-Date).ToString('s')
-    return [string[]]@($removed)
+    return , [string[]]$removed
 }
 
 function Get-UninstallScoopPlan {

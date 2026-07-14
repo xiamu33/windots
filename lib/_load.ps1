@@ -6,6 +6,7 @@
 $_libDir = $PSScriptRoot
 
 . "$_libDir\logging.ps1"
+. "$_libDir\collections.ps1"
 . "$_libDir\i18n.ps1"
 . "$_libDir\config.ps1"
 . "$_libDir\context.ps1"
