@@ -11,3 +11,7 @@ function script:Import-ProfileDir {
 Import-ProfileDir 'functions'
 Import-ProfileDir 'aliases'
 Import-ProfileDir 'init'
+
+if (Get-Module -ListAvailable -Name PSCompletions) {
+  Import-Module PSCompletions
+}
