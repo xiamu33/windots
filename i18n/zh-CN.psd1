@@ -400,6 +400,7 @@
     'pkg.bat.desc'                           = '带语法高亮的 cat 替代'
     'pkg.bottom.desc'                        = '系统资源监控 TUI'
     'pkg.btop.desc'                          = '系统资源监控 TUI'
+    'pkg.cc-switch.desc'                     = 'Claude Code / Codex / Gemini CLI 等供应商切换助手'
     'pkg.curl.desc'                          = '命令行 HTTP 客户端'
     'pkg.dbeaver.desc'                       = '通用数据库管理工具'
     'pkg.delta.desc'                         = 'git diff 高亮增强'

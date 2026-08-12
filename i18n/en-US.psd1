@@ -400,6 +400,7 @@
     'pkg.bat.desc'                           = 'cat clone with syntax highlighting'
     'pkg.bottom.desc'                        = 'System monitor TUI'
     'pkg.btop.desc'                          = 'System monitor TUI'
+    'pkg.cc-switch.desc'                     = 'Provider switcher for Claude Code, Codex, Gemini CLI, etc.'
     'pkg.curl.desc'                          = 'Command-line HTTP client'
     'pkg.dbeaver.desc'                       = 'Universal database management tool'
     'pkg.delta.desc'                         = 'Git diff syntax highlighter'

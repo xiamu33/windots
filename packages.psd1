@@ -154,6 +154,7 @@
                     Title  = 'pkg.group.apps.dev'
                     Global = $true
                     Items  = @(
+                        @{ Name = 'cc-switch'; Packages = 'extras/cc-switch' }
                         @{ Name = 'dbeaver'; Packages = 'extras/dbeaver' }
                         @{ Name = 'rider'; Packages = 'extras/rider' }
                         @{ Name = 'unigetui'; Packages = 'extras/unigetui' }
@@ -171,7 +172,11 @@
                 @{
                     Title = 'pkg.group.apps.productivity'
                     Items = @(
-                        @{ Name = 'altsnap'; Packages = 'extras/altsnap' }
+                        @{
+                            Name     = 'altsnap'
+                            Packages = 'extras/altsnap'
+                            Dotfiles = @{ Src = 'dotfiles/altsnap/AltSnap.ini'; Dest = 'SCOOP_PATH\apps\altsnap\current\AltSnap.ini' }
+                        }
                         @{ Name = 'everything'; Packages = 'extras/everything'; Global = $true }
                         @{ Name = 'everythingtoolbar'; Packages = 'extras/everythingtoolbar'; Global = $true }
                         @{
@@ -183,7 +188,11 @@
                             )
                         }
                         @{ Name = 'InputTip'; Packages = 'abyss/abgox.InputTip-zip' }
-                        @{ Name = 'pixpin'; Packages = 'abyss/PixPin.PixPin' }
+                        @{
+                            Name     = 'pixpin'
+                            Packages = 'abyss/PixPin.PixPin'
+                            Dotfiles = @{ Src = 'dotfiles/pixpin/PixPinConfig.json'; Dest = 'LOCAL_APPDATA\PixPin\Config\PixPinConfig.json' }
+                        }
                         @{ Name = 'powertoys'; Packages = 'extras/powertoys'; Global = $true }
                     )
                 }
