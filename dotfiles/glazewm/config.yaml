@@ -169,14 +169,25 @@ window_rules:
         window_class: { not_regex: "PPTFrameClass" }
       - window_process: { equals: "mmc" }
       - window_process: { equals: "vmconnect" }
+      - window_process: { equals: "NeatDM" }
 
   - commands: ["set-floating --centered"]
     match:
+      - window_process: { equals: "Cursor" }
+        window_title: { regex: "[^Cursor Agents]" }
       - window_process: { equals: "Taskmgr" }
+      - window_process: { equals: "v2rayN" }
       - window_process: { equals: "perfmon" }
       - window_process: { equals: "TIM" }
         window_class: { equals: "TXGuiFoundation" }
-        window_title: { includes: "图片查看" }
+        window_title: { regex: "图片查看|屏幕识图" }
+      - window_process: { equals: "ApplicationFrameHost" }
+        window_title: { includes: "计算器" }
+      - window_process: { equals: "wps" }
+      - window_process: { equals: "thunderbird" }
+      - window_process: { equals: "mailmaster" }
+      - window_process: { equals: "excelmarker" }
+      - window_process: { equals: "mpc-be64" }
 
   - commands: ["set-floating --centered=false --x-pos=10 --y-pos=550"]
     match:
@@ -216,11 +227,6 @@ window_rules:
       - window_process: { equals: "Cursor" }
         window_title: { regex: ".*windots.*" }
 
-  - commands: ["set-floating --centered"]
-    match:
-      - window_process: { equals: "Cursor" }
-        window_title: { regex: "[^Cursor Agents]" }
-
 binding_modes:
   # When enabled, the focused window can be resized via arrow keys or HJKL.
   - name: "resize"
@@ -252,6 +258,14 @@ binding_modes:
         bindings: ["s", "j", "down"]
       - commands: ["wm-disable-binding-mode --name move-ws"]
         bindings: ["escape", "enter"]
+
+  # 仅 binding mode（不调用 wm-toggle-pause）：YASB 可显示状态，且不会因 pause 拦截快捷键而无法退出。
+  # 效果：屏蔽其余 GlazeWM 快捷键；窗口管理（tiling）仍继续。
+  - name: "pause"
+    display_name: "Paused"
+    keybindings:
+      - commands: ["wm-disable-binding-mode --name pause"]
+        bindings: ["alt+shift+p"]
 
 keybindings:
   # Shift focus in a given direction.
@@ -294,9 +308,8 @@ keybindings:
   - commands: ["wm-enable-binding-mode --name move-ws"]
     bindings: ["alt+shift+m"]
 
-  # Disables window management and all other keybindings until alt+shift+p
-  # is pressed again.
-  - commands: ["wm-toggle-pause"]
+  # 进入 pause binding mode（仅屏蔽快捷键 + YASB 提示；不用 wm-toggle-pause，避免无法退出）
+  - commands: ["wm-enable-binding-mode --name pause"]
     bindings: ["alt+shift+p"]
 
   # Change tiling direction. This determines where new tiling windows will
@@ -330,8 +343,8 @@ keybindings:
     bindings: ["alt+shift+q"]
 
   # Kill GlazeWM process safely.
-  - commands: ["wm-exit"]
-    bindings: ["alt+shift+e"]
+  # - commands: ["wm-exit"]
+  #   bindings: ["alt+shift+e"]
 
   # Re-evaluate configuration file.
   - commands: ["wm-reload-config"]

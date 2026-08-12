@@ -582,6 +582,9 @@
 .glazewm-binding-mode .icon.resize {
   color: #f9e2af;
 }
+.glazewm-binding-mode .icon.pause {
+  color: #f38ba8;
+}
 .glazewm-binding-mode .icon.move-ws {
   color: #89b4fa;
 }

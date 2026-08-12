@@ -125,10 +125,12 @@ widgets:
         none: ""
         resize: "\uE740"
         move-ws: "\uE8EB"
+        pause: "\uE769"   # Pause — Segoe Fluent
       binding_modes_to_cycle_through:
         - none
         - resize
         - move-ws
+        - pause
       callbacks:
         on_left: toggle_label
         on_right: disable_binding_mode
